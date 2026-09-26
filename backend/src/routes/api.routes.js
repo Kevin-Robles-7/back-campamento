@@ -96,7 +96,9 @@ router.post(
 router.get(
   '/comprobantes/:id/analisis',
   asyncHandler(async (req, res) => {
-    const comprobante = await queryOne('SELECT * FROM comprobantes WHERE id = ?', [req.params.id]);
+    const comprobante = await queryOne('SELECT * FROM comprobantes WHERE id = $1', [
+      req.params.id,
+    ]);
     if (!comprobante) {
       res.status(404).json({ error: 'Comprobante no encontrado.' });
       return;
