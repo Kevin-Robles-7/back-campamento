@@ -1,0 +1,795 @@
+<form class="grid gap-4" [formGroup]="formulario" (ngSubmit)="enviar()">
+  <!-- ====== Resumen del dinero disponible ====== -->
+  <!-- ====== Resumen del dinero: debe quedar todo en cero ====== -->
+  <aside
+    class="sticky top-19 z-20 grid gap-2 rounded-2xl border bg-green-deep/95 px-4 py-3
+           backdrop-blur-md"
+    [class]="
+      excedido()
+        ? 'border-fallo/60'
+        : sinAsignar() > 0
+          ? 'border-aviso/60'
+          : 'border-exito/50'
+    "
+  >
+    <div class="grid grid-cols-3 gap-2">
+      <div class="grid gap-0.5">
+        <span class="text-xs text-muted">Pagado</span>
+        <strong class="text-sm font-bold">{{ valorPagado() | pesos }}</strong>
+      </div>
+      <div class="grid gap-0.5">
+        <span class="text-xs text-muted">Asignado</span>
+        <strong class="text-sm font-bold">{{ totalAsignado() | pesos }}</strong>
+      </div>
+      <div class="grid gap-0.5">
+        <span class="text-xs text-muted">
+          {{ excedido() ? 'Excedido' : sinAsignar() > 0 ? 'Sin asignar' : 'Repartido' }}
+        </span>
+        <strong
+          class="text-sm font-bold"
+          [class]="excedido() ? 'text-fallo' : sinAsignar() > 0 ? 'text-aviso' : 'text-exito'"
+        >
+          @if (excedido()) {
+            {{ -disponible() | pesos }}
+          } @else if (sinAsignar() > 0) {
+            {{ sinAsignar() | pesos }}
+          } @else {
+            Todo
+          }
+        </strong>
+      </div>
+    </div>
+
+    <p class="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-white/10 pt-2 text-xs text-muted">
+      <span class="flex items-center gap-1.5">
+        <app-icon name="bus" [size]="14" />
+        {{ porTransporte().bus }} en bus
+      </span>
+      <span class="flex items-center gap-1.5">
+        <app-icon name="car" [size]="14" />
+        {{ porTransporte().vehiculo }} en vehículo propio
+      </span>
+      <span>Cupos por {{ totalCupos() | pesos }}</span>
+    </p>
+
+    @if (sinAsignar() > 0 && !excedido()) {
+      <p class="flex items-start gap-2 border-t border-white/10 pt-2 text-xs text-aviso">
+        <app-icon class="mt-0.5 shrink-0" name="alert" [size]="14" />
+        <span>{{ sugerenciaReparto() }}</span>
+      </p>
+    } @else if (!excedido()) {
+      <p class="flex items-center gap-2 border-t border-white/10 pt-2 text-xs text-exito">
+        <app-icon name="check-circle" [size]="14" />
+        Todo el pago quedó repartido
+      </p>
+    }
+  </aside>
+
+  <p class="text-sm text-cream-dim">
+    Completa los datos de cada persona tal como aparecen en el documento de identidad. Cada una
+    elige su transporte: bus ({{ tarifaBus() | pesos }}) o vehículo propio
+    ({{ tarifaVehiculo() | pesos }}). Pueden ir mezclados en la misma inscripción.
+    <strong class="text-cream">
+      Todo el pago de {{ valorPagado() | pesos }} debe quedar repartido
+    </strong>
+    para poder confirmar.
+  </p>
+
+  <!-- ====== Tarjetas de personas ====== -->
+  <div class="grid gap-4" formArrayName="personas">
+    @for (grupo of personas.controls; track $index; let i = $index) {
+      <article class="card-flush animate-rise" [formGroupName]="i">
+        <header class="card-head">
+          <h3 class="card-title">
+            <app-icon name="user" [size]="17" />
+            Persona {{ i + 1 }}
+            @if (edad(i) !== null) {
+              <span class="font-sans text-xs font-normal text-muted">· {{ edad(i) }} años</span>
+            }
+          </h3>
+
+          <div class="flex items-center gap-2">
+            @if (esAbono(i)) {
+              <span class="badge badge-warn">Abono</span>
+            } @else {
+              <span class="badge badge-ok">Pago completo</span>
+            }
+
+            @if (personas.length > 1) {
+              <button
+                class="grid size-8 cursor-pointer place-items-center rounded-full border
+                       border-white/15 text-cream-dim transition
+                       hover:border-fallo/50 hover:text-fallo"
+                type="button"
+                (click)="quitar(i)"
+                [attr.aria-label]="'Quitar persona ' + (i + 1)"
+              >
+                <app-icon name="x" [size]="15" />
+              </button>
+            }
+          </div>
+        </header>
+
+        <div class="card-body">
+          <div class="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div class="campo">
+              <label class="campo-label" [for]="'nombre-' + i">
+                Primer nombre <span class="req">*</span>
+              </label>
+              <input
+                [id]="'nombre-' + i"
+                class="campo-control"
+                [class.invalido]="invalido(i, 'primerNombre')"
+                type="text"
+                autocomplete="given-name"
+                placeholder="María"
+                formControlName="primerNombre"
+              />
+              @if (invalido(i, 'primerNombre')) {
+                <p class="campo-error">Una sola palabra, sin puntos ni guiones.</p>
+              }
+            </div>
+
+            <div class="campo">
+              <label class="campo-label" [for]="'apellido-' + i">
+                Primer apellido <span class="req">*</span>
+              </label>
+              <input
+                [id]="'apellido-' + i"
+                class="campo-control"
+                [class.invalido]="invalido(i, 'primerApellido')"
+                type="text"
+                autocomplete="family-name"
+                placeholder="López"
+                formControlName="primerApellido"
+              />
+              @if (invalido(i, 'primerApellido')) {
+                <p class="campo-error">Una sola palabra, sin puntos ni guiones.</p>
+              }
+            </div>
+
+            <div class="campo">
+              <label class="campo-label" [for]="'nac-' + i">
+                Fecha de nacimiento <span class="req">*</span>
+              </label>
+              <input
+                [id]="'nac-' + i"
+                class="campo-control"
+                [class.invalido]="invalido(i, 'fechaNacimiento')"
+                type="date"
+                [max]="hoy"
+                formControlName="fechaNacimiento"
+              />
+              @if (invalido(i, 'fechaNacimiento')) {
+                <p class="campo-error">Selecciona la fecha de nacimiento.</p>
+              } @else if (edad(i) !== null) {
+                <p class="campo-hint">{{ edad(i) }} años cumplidos</p>
+              }
+            </div>
+
+            <div class="campo">
+              <label class="campo-label" [for]="'sexo-' + i">
+                Sexo <span class="req">*</span>
+              </label>
+              <select
+                [id]="'sexo-' + i"
+                class="campo-control"
+                [class.invalido]="invalido(i, 'sexo')"
+                formControlName="sexo"
+              >
+                <option value="">Selecciona…</option>
+                <option value="F">Femenino</option>
+                <option value="M">Masculino</option>
+              </select>
+              @if (invalido(i, 'sexo')) {
+                <p class="campo-error">Selecciona una opción.</p>
+              }
+            </div>
+
+            <div class="campo">
+              <label class="campo-label" [for]="'tipoDoc-' + i">
+                Tipo de documento <span class="req">*</span>
+              </label>
+              <select
+                [id]="'tipoDoc-' + i"
+                class="campo-control"
+                [class.invalido]="
+                  errorGrupo(i, 'documentoDeMayor') || errorGrupo(i, 'documentoDeMenor')
+                "
+                formControlName="tipoDocumento"
+              >
+                @for (tipo of tiposDocumento; track tipo.valor) {
+                  <option [value]="tipo.valor" [disabled]="!tipoPermitido(i, tipo.valor)">
+                    {{ tipo.etiqueta }}
+                    @if (!tipoPermitido(i, tipo.valor)) {
+                      (no aplica por la edad)
+                    }
+                  </option>
+                }
+              </select>
+              @if (errorGrupo(i, 'documentoDeMayor')) {
+                <p class="campo-error">Un menor de edad no puede tener cédula de ciudadanía.</p>
+              } @else if (errorGrupo(i, 'documentoDeMenor')) {
+                <p class="campo-error">Ese documento es solo para menores de edad.</p>
+              } @else if (edad(i) !== null) {
+                <p class="campo-hint">Sugerido por la edad. Puedes cambiarlo.</p>
+              }
+            </div>
+
+            <div class="campo">
+              <label class="campo-label" [for]="'doc-' + i">
+                Número de documento <span class="req">*</span>
+              </label>
+              <input
+                [id]="'doc-' + i"
+                class="campo-control"
+                [class.invalido]="invalido(i, 'documento') || errorGrupo(i, 'documentoNoNumerico')"
+                type="text"
+                inputmode="numeric"
+                autocomplete="off"
+                placeholder="1037654321"
+                formControlName="documento"
+              />
+              @if (invalido(i, 'documento')) {
+                <p class="campo-error">Sin puntos, guiones ni espacios (4 a 20 caracteres).</p>
+              } @else if (errorGrupo(i, 'documentoNoNumerico')) {
+                <p class="campo-error">Ese tipo de documento solo admite números.</p>
+              }
+            </div>
+
+            <div class="campo">
+              <label class="campo-label" [for]="'exp-' + i">
+                Fecha de expedición <span class="req">*</span>
+              </label>
+              <input
+                [id]="'exp-' + i"
+                class="campo-control"
+                [class.invalido]="
+                  invalido(i, 'fechaExpedicion') ||
+                  errorGrupo(i, 'expedicionAntesDeNacer') ||
+                  errorGrupo(i, 'cedulaAntesDe18')
+                "
+                type="date"
+                [max]="hoy"
+                formControlName="fechaExpedicion"
+              />
+              @if (invalido(i, 'fechaExpedicion')) {
+                <p class="campo-error">Indica la fecha de expedición.</p>
+              } @else if (errorGrupo(i, 'expedicionAntesDeNacer')) {
+                <p class="campo-error">No puede ser anterior a la fecha de nacimiento.</p>
+              } @else if (errorGrupo(i, 'cedulaAntesDe18')) {
+                <p class="campo-error">La cédula se expide a partir de los 18 años.</p>
+              } @else {
+                <p class="campo-hint">Como aparece en el documento</p>
+              }
+            </div>
+
+            <div class="campo">
+              <label class="campo-label" [for]="'tel-' + i">
+                Teléfono <span class="req">*</span>
+              </label>
+              <input
+                [id]="'tel-' + i"
+                class="campo-control"
+                [class.invalido]="invalido(i, 'telefono')"
+                type="tel"
+                inputmode="numeric"
+                autocomplete="tel"
+                placeholder="3001234567"
+                formControlName="telefono"
+              />
+              @if (invalido(i, 'telefono')) {
+                <p class="campo-error">De 7 a 10 dígitos, sin espacios ni guiones.</p>
+              }
+            </div>
+
+            <div class="campo">
+              <label class="campo-label" [for]="'eps-' + i">EPS <span class="req">*</span></label>
+              <input
+                [id]="'eps-' + i"
+                class="campo-control"
+                [class.invalido]="invalido(i, 'eps')"
+                type="text"
+                placeholder="Sura, Sanitas, Nueva EPS…"
+                formControlName="eps"
+              />
+              @if (invalido(i, 'eps')) {
+                <p class="campo-error">Escribe la EPS.</p>
+              }
+            </div>
+
+            <div class="campo">
+              <label class="campo-label" [for]="'correo-' + i">Correo electrónico</label>
+              <input
+                [id]="'correo-' + i"
+                class="campo-control"
+                [class.invalido]="invalido(i, 'correo')"
+                type="email"
+                autocomplete="email"
+                placeholder="correo@ejemplo.com"
+                formControlName="correo"
+              />
+              @if (invalido(i, 'correo')) {
+                <p class="campo-error">Escribe un correo válido, como nombre&#64;dominio.com</p>
+              }
+            </div>
+
+            @if (esMenor(i)) {
+              <div class="campo">
+                <label class="campo-label" [for]="'acomp-' + i">
+                  Nombre del acompañante del menor <span class="req">*</span>
+                </label>
+                <input
+                  [id]="'acomp-' + i"
+                  class="campo-control"
+                  type="text"
+                  placeholder="Quién viaja con el menor"
+                  formControlName="nombreAcompanante"
+                />
+              </div>
+            }
+          </div>
+
+          <!-- ====== Transporte de esta persona ====== -->
+          <fieldset class="mt-6 border-0 p-0">
+            <legend class="campo-label mb-2 p-0">
+              ¿Cómo viaja esta persona? <span class="req">*</span>
+            </legend>
+
+            <div class="grid gap-2 sm:grid-cols-2 lg:max-w-2xl">
+              <label class="opcion-check">
+                <input type="radio" value="bus" formControlName="transporte" />
+                <span class="flex items-center gap-2">
+                  <app-icon name="bus" [size]="18" />
+                  <span>
+                    En bus
+                    <span class="block text-xs text-muted">{{ tarifaBus() | pesos }}</span>
+                  </span>
+                </span>
+              </label>
+              <label class="opcion-check">
+                <input type="radio" value="vehiculo_propio" formControlName="transporte" />
+                <span class="flex items-center gap-2">
+                  <app-icon name="car" [size]="18" />
+                  <span>
+                    Vehículo propio
+                    <span class="block text-xs text-muted">{{ tarifaVehiculo() | pesos }}</span>
+                  </span>
+                </span>
+              </label>
+            </div>
+          </fieldset>
+
+          <!-- ====== Tipo de pago ====== -->
+          <fieldset class="mt-5 border-0 p-0">
+            <legend class="campo-label mb-2 p-0">Tipo de pago <span class="req">*</span></legend>
+
+            <div class="grid gap-2 sm:grid-cols-2 lg:max-w-2xl">
+              <label
+                class="opcion-check"
+                [class.opacity-50]="!alcanzaCompleto(i)"
+                [class.cursor-not-allowed]="!alcanzaCompleto(i)"
+              >
+                <input
+                  type="radio"
+                  value="completo"
+                  formControlName="tipoPago"
+                  [disabled]="!alcanzaCompleto(i)"
+                />
+                <span>
+                  Pago completo · {{ tarifaDe(i) | pesos }}
+                  @if (!alcanzaCompleto(i)) {
+                    <span class="block text-xs text-aviso">El pago no alcanza un cupo completo</span>
+                  }
+                </span>
+              </label>
+              <label class="opcion-check">
+                <input type="radio" value="abono" formControlName="tipoPago" />
+                <span>Abono desde {{ abonoMinimo() | pesos }}</span>
+              </label>
+            </div>
+
+            @if (esAbono(i)) {
+              <div class="campo mt-3 max-w-xs">
+                <label class="campo-label" [for]="'abono-' + i">
+                  Valor del abono <span class="req">*</span>
+                </label>
+                <input
+                  [id]="'abono-' + i"
+                  class="campo-control"
+                  type="number"
+                  inputmode="numeric"
+                  [min]="abonoMinimo()"
+                  [max]="maximoAbono(i)"
+                  step="1000"
+                  [placeholder]="abonoMinimo()"
+                  formControlName="valorAbono"
+                />
+                <p class="campo-hint">
+                  Queda debiendo {{ saldoDe(i) | pesos }} · máximo {{ maximoAbono(i) | pesos }}
+                </p>
+
+                @if (admiteResto(i)) {
+                  <button
+                    class="btn btn-outline btn-sm w-fit"
+                    type="button"
+                    (click)="sumarResto(i)"
+                  >
+                    <app-icon name="plus" [size]="14" />
+                    Sumarle los {{ sinAsignar() | pesos }} que faltan
+                  </button>
+                }
+              </div>
+            }
+          </fieldset>
+
+          <!-- ============================================================
+               Consentimiento para menores de edad
+               Formulario a la izquierda, documento que se autocompleta
+               a la derecha: aprovecha el ancho sin desperdiciar espacio.
+               ============================================================ -->
+          @if (esMenor(i)) {
+            <fieldset
+              class="animate-rise mt-6 rounded-2xl border border-aviso/40 bg-aviso/[0.06] p-4"
+              formGroupName="consentimiento"
+            >
+              <legend
+                class="flex items-center gap-2 px-2 font-display text-sm font-bold text-aviso"
+              >
+                <app-icon name="alert" [size]="16" />
+                Consentimiento informado · menor de edad
+              </legend>
+
+              <p class="mb-4 text-sm text-cream-dim">
+                Tiene {{ edad(i) }} años, así que necesitamos la autorización de su representante
+                legal. El documento de la derecha se completa solo con lo que escribas.
+              </p>
+
+              <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                <!-- ====== Campos ====== -->
+                <div class="grid items-start gap-4 sm:grid-cols-2">
+                  <div class="campo">
+                    <label class="campo-label" [for]="'rep-' + i">
+                      Nombres y apellidos del representante <span class="req">*</span>
+                    </label>
+                    <input
+                      [id]="'rep-' + i"
+                      class="campo-control"
+                      type="text"
+                      formControlName="nombreRepresentante"
+                    />
+                  </div>
+
+                  <div class="campo">
+                    <label class="campo-label" [for]="'repTipo-' + i">Tipo de documento</label>
+                    <select
+                      [id]="'repTipo-' + i"
+                      class="campo-control"
+                      formControlName="tipoDocumentoRep"
+                    >
+                      <option value="CC">Cédula de ciudadanía</option>
+                      <option value="PA">Pasaporte</option>
+                      <option value="PPT">PPT</option>
+                    </select>
+                  </div>
+
+                  <div class="campo">
+                    <label class="campo-label" [for]="'repDoc-' + i">
+                      Número de identificación <span class="req">*</span>
+                    </label>
+                    <input
+                      [id]="'repDoc-' + i"
+                      class="campo-control"
+                      type="text"
+                      inputmode="numeric"
+                      formControlName="documentoRepresentante"
+                    />
+                  </div>
+
+                  <div class="campo">
+                    <label class="campo-label" [for]="'emerg-' + i">
+                      Teléfono de emergencia <span class="req">*</span>
+                    </label>
+                    <input
+                      [id]="'emerg-' + i"
+                      class="campo-control"
+                      type="tel"
+                      inputmode="numeric"
+                      formControlName="telefonoEmergencia"
+                    />
+                  </div>
+
+                  <div class="campo">
+                    <label class="campo-label" [for]="'cong-' + i">Congregación</label>
+                    <input
+                      [id]="'cong-' + i"
+                      class="campo-control"
+                      type="text"
+                      placeholder="Bosque Popular"
+                      formControlName="congregacion"
+                    />
+                  </div>
+
+                  <div class="campo">
+                    <label class="campo-label" [for]="'depmun-' + i">
+                      Departamento y municipio de residencia
+                    </label>
+                    <input
+                      [id]="'depmun-' + i"
+                      class="campo-control"
+                      type="text"
+                      placeholder="Antioquia, Medellín"
+                      formControlName="departamentoMunicipio"
+                    />
+                  </div>
+
+                  <div class="campo">
+                    <label class="campo-label" [for]="'dest-' + i">
+                      Destino (departamento y municipio)
+                    </label>
+                    <input
+                      [id]="'dest-' + i"
+                      class="campo-control"
+                      type="text"
+                      placeholder="Antioquia, San Jerónimo"
+                      formControlName="destino"
+                    />
+                  </div>
+
+                  <!-- Documento firmado -->
+                  <div class="campo">
+                    <span class="campo-label">Consentimiento firmado (PDF o Word)</span>
+
+                    @if (documentoDe(i); as doc) {
+                      <div
+                        class="flex items-center gap-3 rounded-xl border border-exito/40
+                               bg-exito/12 px-4 py-3"
+                      >
+                        <span
+                          class="grid size-9 shrink-0 place-items-center rounded-lg bg-exito/15
+                                 text-exito"
+                        >
+                          <app-icon name="file-text" [size]="18" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                          <p class="truncate text-sm font-semibold">{{ doc.nombre }}</p>
+                          <p class="text-xs text-muted">
+                            {{ (doc.tamanoBytes / 1024).toFixed(0) }} kB · cargado
+                          </p>
+                        </div>
+                        <button
+                          class="grid size-8 shrink-0 cursor-pointer place-items-center rounded-full
+                                 border border-white/15 text-cream-dim transition
+                                 hover:border-fallo/50 hover:text-fallo"
+                          type="button"
+                          (click)="quitarDocumento(i)"
+                          aria-label="Quitar documento"
+                        >
+                          <app-icon name="x" [size]="15" />
+                        </button>
+                      </div>
+                    } @else {
+                      <label
+                        class="flex cursor-pointer items-center justify-center gap-2 rounded-xl
+                               border border-dashed border-white/25 px-4 py-4 text-sm
+                               text-cream-dim transition hover:border-lime hover:bg-lime/5
+                               hover:text-lime"
+                      >
+                        <input
+                          class="sr-only"
+                          type="file"
+                          accept=".pdf,.doc,.docx,.rtf,image/jpeg,image/png,image/webp"
+                          (change)="subirDocumento(i, $event)"
+                        />
+                        @if (subiendoDocumento() === i) {
+                          <span class="spinner"></span>
+                          Subiendo…
+                        } @else {
+                          <app-icon name="upload" [size]="17" />
+                          Adjuntar PDF, DOC o DOCX
+                        }
+                      </label>
+                      <p class="campo-hint">Opcional si firmas a la derecha. Máximo 8 MB.</p>
+                    }
+
+                    @if (errorDocumento()) {
+                      <p class="campo-error">{{ errorDocumento() }}</p>
+                    }
+                  </div>
+                </div>
+
+                <!-- ====== Documento que se autocompleta ====== -->
+                <div
+                  class="grid content-start gap-3 rounded-xl border border-white/12
+                         bg-green-dark/60 p-4"
+                >
+                  <header class="grid gap-1 border-b border-white/10 pb-3 text-center">
+                    <p class="font-display text-sm font-bold">
+                      IGLESIA PENTECOSTAL UNIDA DE COLOMBIA
+                    </p>
+                    <p class="text-xs text-muted">Distrito 28 · Consentimiento informado</p>
+                  </header>
+
+                  <dl class="grid gap-1.5 text-xs">
+                    <div class="flex flex-wrap gap-x-2">
+                      <dt class="text-muted">Departamento y municipio:</dt>
+                      <dd class="font-semibold text-cream">
+                        {{ campoConsentimiento(i, 'departamentoMunicipio') }}
+                      </dd>
+                    </div>
+                    <div class="flex flex-wrap gap-x-2">
+                      <dt class="text-muted">Fecha de diligenciamiento:</dt>
+                      <dd class="font-semibold text-cream">{{ fechaDiligenciamiento }}</dd>
+                    </div>
+                    <div class="flex flex-wrap gap-x-2">
+                      <dt class="text-muted">Congregación:</dt>
+                      <dd class="font-semibold text-cream">
+                        {{ campoConsentimiento(i, 'congregacion') }}
+                      </dd>
+                    </div>
+                    <div class="flex flex-wrap gap-x-2">
+                      <dt class="text-muted">Fecha de la salida:</dt>
+                      <dd class="font-semibold text-cream">{{ fechaEvento() || '—' }}</dd>
+                    </div>
+                    <div class="flex flex-wrap gap-x-2">
+                      <dt class="text-muted">Destino:</dt>
+                      <dd class="font-semibold text-cream">
+                        {{ campoConsentimiento(i, 'destino') }}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <p class="text-xs leading-relaxed text-cream-dim">
+                    Mediante este documento yo
+                    <strong class="text-lime">{{
+                      campoConsentimiento(i, 'nombreRepresentante')
+                    }}</strong>
+                    identificado(a) con
+                    <strong class="text-lime">{{
+                      campoConsentimiento(i, 'tipoDocumentoRep', 'CC')
+                    }}</strong>
+                    y número de identificación
+                    <strong class="text-lime">{{
+                      campoConsentimiento(i, 'documentoRepresentante')
+                    }}</strong>
+                    y actuando en calidad de representante y/o tutor del menor
+                    <strong class="text-lime">{{ nombreMenor(i) }}</strong>
+                    identificado(a) con
+                    <strong class="text-lime">{{ documentoMenor(i) }}</strong>, autorizo su
+                    participación en el programa y me comprometo a asumir las consecuencias
+                    derivadas de la omisión de los protocolos establecidos por la IPUC para estos
+                    eventos.
+                  </p>
+
+                  <p class="text-xs leading-relaxed text-cream-dim">
+                    En caso de emergencia contactarme al número
+                    <strong class="text-lime">{{
+                      campoConsentimiento(i, 'telefonoEmergencia')
+                    }}</strong>.
+                  </p>
+
+                  <p class="text-xs text-muted">Cordialmente,</p>
+
+                  <!-- Firma -->
+                  <div class="grid gap-1">
+                    <app-firma (cambio)="firmaCambio(i, $event)" />
+                    <p class="text-xs text-muted">
+                      Nombres y apellidos:
+                      <span class="text-cream">
+                        {{ campoConsentimiento(i, 'nombreRepresentante') }}
+                      </span>
+                    </p>
+                    <p class="text-xs text-muted">
+                      No. de identificación:
+                      <span class="text-cream">
+                        {{ campoConsentimiento(i, 'documentoRepresentante') }}
+                      </span>
+                    </p>
+                  </div>
+
+                  @if (consentimientoFirmado(i)) {
+                    <p class="flex items-center gap-1.5 text-xs font-semibold text-exito">
+                      <app-icon name="check-circle" [size]="14" />
+                      Consentimiento firmado
+                    </p>
+                  }
+
+                  <label class="opcion-check items-start">
+                    <input class="mt-0.5" type="checkbox" formControlName="acepta" />
+                    <span class="text-xs">
+                      He leído y acepto el contenido de este consentimiento y autorizo el
+                      tratamiento de los datos personales del menor conforme a la Ley 1581 de 2012.
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </fieldset>
+          }
+        </div>
+      </article>
+    }
+  </div>
+
+  <div class="grid gap-1.5">
+    <button
+      class="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-dashed
+             text-sm font-bold transition"
+      [class]="
+        puedeAgregar()
+          ? 'cursor-pointer border-white/20 text-cream-dim hover:border-lime hover:bg-lime/8 hover:text-lime'
+          : 'cursor-not-allowed border-white/10 text-muted/60'
+      "
+      type="button"
+      [disabled]="!puedeAgregar()"
+      (click)="agregar()"
+    >
+      <app-icon name="plus" [size]="17" />
+      Agregar otra persona
+    </button>
+
+    @if (!puedeAgregar()) {
+      <p class="text-center text-xs text-muted">
+        @if (sinAsignar() === 0) {
+          Todo el pago ya está repartido. Para inscribir a alguien más, reduce el abono de otra
+          persona o realiza un nuevo pago.
+        } @else {
+          Quedan {{ sinAsignar() | pesos }} y el abono mínimo por persona es
+          {{ abonoMinimo() | pesos }}: no alcanza para alguien nuevo.
+        }
+      </p>
+    }
+  </div>
+
+  <!-- ====== Avisos ====== -->
+  @if (intentoEnvio() && camposFaltantes().length) {
+    <div class="alerta alerta-warn" role="alert">
+      <app-icon class="mt-0.5 shrink-0" name="alert" [size]="18" />
+      <span>
+        <strong>Faltan datos por completar:</strong>
+        <ul class="mt-1 grid list-disc gap-0.5 pl-4">
+          @for (falta of camposFaltantes(); track falta) {
+            <li>{{ falta }}</li>
+          }
+        </ul>
+      </span>
+    </div>
+  }
+
+  @if (problemas().length) {
+    <div class="alerta alerta-warn" role="alert">
+      <app-icon class="mt-0.5 shrink-0" name="info" [size]="18" />
+      <span>
+        <strong>Revisa lo siguiente antes de continuar:</strong>
+        <ul class="mt-1 grid list-disc gap-0.5 pl-4">
+          @for (problema of problemas(); track problema) {
+            <li>{{ problema }}</li>
+          }
+        </ul>
+      </span>
+    </div>
+  }
+
+  @if (errorServidor()) {
+    <div class="alerta alerta-error" role="alert">
+      <app-icon class="mt-0.5 shrink-0" name="alert" [size]="18" />
+      <span>{{ errorServidor() }}</span>
+    </div>
+  }
+
+  <!-- ====== Navegación ====== -->
+  <div class="mt-2 flex flex-wrap gap-3">
+    <button class="btn btn-outline flex-1 basis-44" type="button" (click)="atras.emit()">
+      <app-icon name="arrow-left" [size]="17" />
+      Anterior
+    </button>
+    <button class="btn btn-lime flex-1 basis-44" type="submit" [disabled]="enviando()">
+      @if (enviando()) {
+        <span class="spinner"></span>
+        Registrando…
+      } @else {
+        Confirmar inscripción
+        <app-icon name="arrow-right" [size]="17" />
+      }
+    </button>
+  </div>
+</form>

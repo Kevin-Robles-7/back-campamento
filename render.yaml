@@ -1,0 +1,64 @@
+# ============================================================
+#  Render · API Node/Express
+#  Las variables marcadas con sync:false se pegan en el panel de Render,
+#  nunca en este archivo ni en el repositorio.
+# ============================================================
+
+services:
+  - type: web
+    name: campamento-api
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+
+      # --- Base de datos (Supabase) ---
+      # Project Settings > Database > Connection string (URI, puerto 6543)
+      - key: DATABASE_URL
+        sync: false
+
+      # --- Almacenamiento de comprobantes ---
+      - key: STORAGE_DRIVER
+        value: s3
+      - key: S3_BUCKET
+        value: comprobantes
+      - key: S3_REGION
+        value: us-east-1
+      - key: S3_FORCE_PATH_STYLE
+        value: "true"
+      - key: S3_URL_MINUTOS
+        value: "15"
+      # Project Settings > Storage > S3 Connection
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+
+      # --- Lectura de comprobantes ---
+      # Tesseract no cabe bien en los 512 MB del plan gratuito: se usa Gemini.
+      - key: OCR_PROVIDER
+        value: gemini
+      # Google retira modelos con frecuencia. Si la API responde 404 diciendo
+      # que el modelo ya no existe, se cambia aqui sin tocar el codigo.
+      - key: GEMINI_MODELO
+        value: gemini-3.8-flash
+      - key: GEMINI_API_KEY
+        sync: false
+
+      # --- Dominio del frontend autorizado ---
+      - key: CORS_ORIGIN
+        sync: false
+
+      - key: MAX_UPLOAD_MB
+        value: "8"
+      - key: MINUTOS_BORRADOR
+        value: "45"

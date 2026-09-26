@@ -1,0 +1,81 @@
+<header
+  class="fixed inset-x-0 top-0 z-60 border-b transition-all duration-300"
+  [class]="
+    fijo()
+      ? 'border-white/10 bg-dark/85 backdrop-blur-lg backdrop-saturate-150'
+      : 'border-transparent bg-transparent'
+  "
+>
+  <div class="shell flex min-h-17 items-center justify-between gap-4">
+    <!-- ====== Marca ====== -->
+    <a
+      class="flex shrink-0 items-center gap-3"
+      routerLink="/"
+      (click)="cerrarMenu()"
+      aria-label="Campamento IPUC Bosque Popular — inicio"
+    >
+      <span
+        class="grid size-10 place-items-center rounded-xl border border-lime/35 bg-lime/12 text-lime"
+        aria-hidden="true"
+      >
+        <svg
+          class="size-5.5"
+          viewBox="0 0 32 32"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.2"
+          stroke-linecap="round"
+        >
+          <path d="M4 27 16 6l12 21" />
+          <path d="M11 27 16 17l5 10" />
+        </svg>
+      </span>
+      <span class="grid leading-tight">
+        <span class="font-display text-sm font-bold tracking-[0.06em] uppercase">
+          Campamento <span class="text-lime">BP</span>
+        </span>
+        <span class="text-[0.63rem] tracking-[0.12em] text-muted uppercase">
+          IPUC Bosque Popular
+        </span>
+      </span>
+    </a>
+
+    <!-- ====== Navegación ====== -->
+    <nav
+      class="items-center gap-7 max-lg:absolute max-lg:inset-x-5 max-lg:top-17 max-lg:grid
+             max-lg:gap-1 max-lg:rounded-2xl max-lg:border max-lg:border-white/10
+             max-lg:bg-green-deep max-lg:p-3 max-lg:shadow-deep max-lg:transition-all
+             sm:max-lg:inset-x-7 lg:flex"
+      [class]="
+        menuAbierto()
+          ? 'max-lg:visible max-lg:translate-y-0 max-lg:opacity-100'
+          : 'max-lg:invisible max-lg:-translate-y-2.5 max-lg:opacity-0'
+      "
+      aria-label="Navegación principal"
+    >
+      @for (enlace of enlaces; track enlace.ancla) {
+        <a
+          class="text-sm text-cream-dim transition hover:text-lime
+                 max-lg:rounded-xl max-lg:px-3 max-lg:py-2.5 max-lg:hover:bg-white/5"
+          [routerLink]="enlace.destino"
+          [fragment]="enlace.ancla"
+          (click)="cerrarMenu()"
+        >
+          {{ enlace.texto }}
+        </a>
+      }
+    </nav>
+
+    <!-- ====== Botón de menú (móvil / tablet) ====== -->
+    <button
+      class="grid size-10.5 cursor-pointer place-items-center rounded-xl border border-white/15
+             text-cream transition hover:border-lime/40 hover:text-lime lg:hidden"
+      type="button"
+      (click)="alternarMenu()"
+      [attr.aria-expanded]="menuAbierto()"
+      [attr.aria-label]="menuAbierto() ? 'Cerrar menú' : 'Abrir menú'"
+    >
+      <app-icon [name]="menuAbierto() ? 'x' : 'menu'" [size]="22" />
+    </button>
+  </div>
+</header>

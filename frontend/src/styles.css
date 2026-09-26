@@ -1,0 +1,412 @@
+@import 'tailwindcss';
+
+/* ============================================================
+   Campamento IPUC Bosque Popular
+   Paleta y tipografía tomadas del sitio original.
+   ============================================================ */
+
+@theme {
+  /* --- Marca --- */
+  --color-lime: #c7ff3d;
+  --color-lime-soft: #dcff8a;
+  --color-green: #173f32;
+  --color-green-deep: #0e2721;
+  --color-green-dark: #0a1a16;
+  --color-dark: #07110f;
+  --color-dark-soft: #09120f;
+  --color-cream: #f4f1e8;
+  --color-cream-dim: #c9d2cb;
+  --color-muted: #9ea9a2;
+  --color-orange: #ff8a3d;
+
+  /* --- Tonos de estado, legibles sobre fondo oscuro ---
+     Se definen explícitos para no depender de las escalas por defecto
+     de Tailwind, que se mezclan mal con la paleta de la marca. */
+  --color-aviso: #ffb374;
+  --color-aviso-texto: #ffe3cc;
+  --color-exito: #6ee7a0;
+  --color-exito-texto: #cdf5de;
+  --color-fallo: #ff8f8f;
+  --color-fallo-texto: #ffd9d9;
+  --color-info-texto: #e6f2d6;
+
+  /* --- Tipografía --- */
+  --font-display: 'Outfit', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+
+  /* --- Sombras --- */
+  --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --shadow-deep: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --shadow-lime: 0 12px 30px rgba(199, 255, 61, 0.25);
+
+  /* --- Animaciones --- */
+  --animate-rise: rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-float: float 14s ease-in-out infinite;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-24px) scale(1.06);
+  }
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 5rem;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply min-h-dvh bg-dark font-sans text-cream antialiased;
+    overflow-x: hidden;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display font-extrabold tracking-tight;
+    line-height: 1.1;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-lime;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    @apply bg-lime text-dark;
+  }
+
+  /* Scrollbar discreta acorde a la paleta */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-dark-soft;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-green-deep;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-green;
+  }
+
+  /* Autorrellenado de formularios sobre fondo oscuro */
+  input:-webkit-autofill,
+  input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--color-cream);
+    -webkit-box-shadow: 0 0 0 1000px var(--color-green-dark) inset;
+  }
+}
+
+/* ============================================================
+   Componentes reutilizables
+   ============================================================ */
+
+@layer components {
+  /* ---------------- Contenedor ---------------- */
+
+  /* Contenedor ancho: aprovecha las pantallas grandes sin llegar a bordes. */
+  .shell {
+    @apply mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Contenedor de lectura: formularios y tablas de datos. */
+  .shell-narrow {
+    @apply mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8;
+  }
+
+  /* ---------------- Tipografía de sección ---------------- */
+
+  .kicker {
+    @apply inline-flex items-center gap-2 font-sans text-[0.7rem] font-bold tracking-[0.18em] text-lime uppercase;
+  }
+
+  .kicker::before {
+    content: '';
+    @apply h-px w-7 bg-lime/40;
+  }
+
+  .titulo-seccion {
+    @apply font-display text-3xl leading-[1.08] font-extrabold sm:text-4xl lg:text-5xl;
+  }
+
+  .titulo-seccion strong {
+    @apply text-lime;
+  }
+
+  .lead {
+    @apply max-w-[62ch] text-cream-dim;
+  }
+
+  /* ---------------- Botones ---------------- */
+
+  .btn {
+    @apply inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-full
+           px-6 py-3 text-center text-sm font-bold transition-all duration-200
+           disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0;
+  }
+
+  .btn-lime {
+    @apply bg-lime text-dark shadow-lime hover:-translate-y-0.5 hover:bg-lime-soft;
+  }
+
+  .btn-outline {
+    @apply border border-white/15 bg-white/5 text-cream
+           hover:-translate-y-0.5 hover:border-lime/50 hover:bg-lime/10 hover:text-lime;
+  }
+
+  .btn-ghost {
+    @apply px-3 text-cream-dim hover:text-lime;
+  }
+
+  .btn-sm {
+    @apply min-h-9 px-4 py-2 text-xs;
+  }
+
+  .btn-block {
+    @apply w-full;
+  }
+
+  /* Acción principal tipo tarjeta (los 3 accesos del inicio) */
+  .btn-accion {
+    @apply flex w-full cursor-pointer items-center gap-4 rounded-2xl border p-4 text-left
+           transition-all duration-200 sm:p-5;
+  }
+
+  .btn-accion-lime {
+    @apply border-lime/40 bg-linear-to-br from-lime/15 to-lime/[0.03]
+           hover:-translate-y-1 hover:border-lime hover:shadow-deep;
+  }
+
+  .btn-accion-muted {
+    @apply border-white/10 bg-white/[0.04]
+           hover:-translate-y-1 hover:border-lime/40 hover:shadow-soft;
+  }
+
+  /* ---------------- Tarjetas ---------------- */
+
+  .card {
+    @apply rounded-2xl border border-white/10 bg-white/[0.035] p-5 backdrop-blur-sm;
+  }
+
+  .card-flush {
+    @apply overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035];
+  }
+
+  .card-head {
+    @apply flex items-center justify-between gap-3 border-b border-white/10 bg-white/[0.03] px-5 py-4;
+  }
+
+  .card-title {
+    @apply flex items-center gap-2 font-display text-base font-bold;
+  }
+
+  .card-body {
+    @apply p-5;
+  }
+
+  /* ---------------- Lista de datos ---------------- */
+
+  .data-list {
+    @apply grid gap-px overflow-hidden rounded-xl border border-white/10 bg-white/10;
+  }
+
+  .data-row {
+    @apply flex items-center justify-between gap-4 bg-green-dark px-4 py-2.5 text-sm;
+  }
+
+  .data-row dt {
+    @apply text-muted;
+  }
+
+  .data-row dd {
+    @apply text-right font-semibold break-words;
+  }
+
+  /* ---------------- Badges ---------------- */
+
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-bold whitespace-nowrap;
+  }
+
+  .badge-lime {
+    @apply border-lime/35 bg-lime/15 text-lime;
+  }
+
+  .badge-ok {
+    @apply border-exito/40 bg-exito/15 text-exito;
+  }
+
+  .badge-warn {
+    @apply border-aviso/40 bg-aviso/15 text-aviso;
+  }
+
+  .badge-neutral {
+    @apply border-white/15 bg-white/10 text-cream-dim;
+  }
+
+  /* ---------------- Alertas ----------------
+     Fondo al 14% y texto claro: legible sobre el fondo oscuro sin
+     que el bloque se vea negro. */
+
+  .alerta {
+    @apply flex items-start gap-3 rounded-xl border p-4 text-sm leading-relaxed;
+  }
+
+  .alerta strong {
+    @apply block font-bold;
+  }
+
+  .alerta-ok {
+    @apply border-exito/40 bg-exito/14 text-exito-texto;
+  }
+
+  .alerta-ok strong {
+    @apply text-exito;
+  }
+
+  .alerta-info {
+    @apply border-lime/35 bg-lime/12 text-info-texto;
+  }
+
+  .alerta-info strong {
+    @apply text-lime;
+  }
+
+  .alerta-warn {
+    @apply border-aviso/45 bg-aviso/14 text-aviso-texto;
+  }
+
+  .alerta-warn strong {
+    @apply text-aviso;
+  }
+
+  .alerta-error {
+    @apply border-fallo/45 bg-fallo/14 text-fallo-texto;
+  }
+
+  .alerta-error strong {
+    @apply text-fallo;
+  }
+
+  /* ---------------- Formularios ----------------
+     Todos los campos miden igual: etiqueta de alto fijo (dos líneas),
+     control de 44 px y una línea reservada para el mensaje. Así la rejilla
+     queda pareja en móvil, tablet y escritorio. */
+
+  .campo {
+    @apply grid content-start gap-1.5;
+  }
+
+  .campo-label {
+    @apply flex items-end text-xs font-semibold tracking-wide text-cream-dim;
+    min-height: 2rem;
+  }
+
+  .campo-label .req {
+    @apply text-lime;
+  }
+
+  .campo-control {
+    @apply h-11 w-full rounded-xl border border-white/15 bg-green-dark px-3.5
+           text-sm text-cream transition
+           placeholder:text-muted/70
+           hover:border-white/25
+           focus:border-lime focus:ring-3 focus:ring-lime/20 focus:outline-none
+           disabled:cursor-not-allowed disabled:opacity-55;
+  }
+
+  .campo-control.invalido {
+    @apply border-fallo focus:ring-fallo/20;
+  }
+
+  select.campo-control {
+    @apply appearance-none bg-no-repeat pr-9;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239ea9a2' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-position: right 0.85rem center;
+  }
+
+  /* Los campos de fecha en iOS y Safari crecen solos: se fuerza la altura. */
+  input[type='date'].campo-control,
+  input[type='datetime-local'].campo-control {
+    @apply block;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  /* Línea reservada para el mensaje: las filas no se desalinean. */
+  .campo-error,
+  .campo-hint {
+    @apply text-xs;
+    min-height: 1.05rem;
+  }
+
+  .campo-error {
+    @apply text-fallo;
+  }
+
+  .campo-hint {
+    @apply text-muted;
+  }
+
+  .rejilla {
+    @apply grid items-start gap-4 sm:grid-cols-2;
+  }
+
+  .rejilla-full {
+    @apply sm:col-span-2;
+  }
+
+  /* Opción seleccionable (radio / checkbox) */
+  .opcion-check {
+    @apply flex cursor-pointer items-center gap-3 rounded-xl border border-white/15
+           bg-green-dark px-4 py-2.5 text-sm transition
+           hover:border-lime/40
+           has-checked:border-lime has-checked:bg-lime/10;
+  }
+
+  .opcion-check input {
+    @apply size-[18px] shrink-0 accent-lime;
+  }
+
+  /* ---------------- Utilidades varias ---------------- */
+
+  .spinner {
+    @apply size-[18px] shrink-0 animate-spin rounded-full border-2 border-white/25 border-t-current;
+  }
+
+  .sr-only-focusable {
+    @apply sr-only focus:not-sr-only;
+  }
+}

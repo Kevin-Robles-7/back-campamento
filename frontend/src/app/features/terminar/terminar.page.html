@@ -1,0 +1,450 @@
+<app-encabezado />
+
+<main class="min-h-svh py-28 pb-20" id="contenido">
+  <div class="shell-narrow grid gap-4">
+    <p class="kicker">Terminar inscripción</p>
+    <h1 class="titulo-seccion">Realiza un <strong>pago o abono</strong></h1>
+    <p class="lead">
+      Busca tu inscripción existente, sube el comprobante del nuevo abono y actualizamos tu saldo al
+      instante.
+    </p>
+
+    @if (error()) {
+      <div class="alerta alerta-error" role="alert">
+        <app-icon class="mt-0.5 shrink-0" name="alert" [size]="18" />
+        <span>{{ error() }}</span>
+      </div>
+    }
+
+    @switch (etapa()) {
+      <!-- ============================================================
+           1 · Buscar la inscripción
+           ============================================================ -->
+      @case ('buscar') {
+        <section class="animate-rise grid gap-4">
+          <form
+            class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start"
+            [formGroup]="formulario"
+            (ngSubmit)="buscar()"
+          >
+            <div class="campo">
+              <label class="campo-label" for="valor">Documento o código de inscripción</label>
+              <input
+                id="valor"
+                class="campo-control"
+                type="text"
+                autocomplete="off"
+                placeholder="1037654321  ·  BP-IC1XF9MN"
+                formControlName="valor"
+              />
+              <p class="campo-hint">
+                Busca por el documento de cualquier persona de la inscripción, o por el código
+              </p>
+            </div>
+
+            <button class="btn btn-lime mt-8 min-w-36" type="submit" [disabled]="buscando()">
+              @if (buscando()) {
+                <span class="spinner"></span>
+                Buscando…
+              } @else {
+                <app-icon name="search" [size]="17" />
+                Buscar
+              }
+            </button>
+          </form>
+        </section>
+      }
+
+      <!-- ============================================================
+           2 · Inscripción encontrada
+           ============================================================ -->
+      @case ('encontrada') {
+        @if (inscripcion(); as ins) {
+          <section class="animate-rise grid gap-3">
+            <div class="alerta alerta-ok">
+              <app-icon class="mt-0.5 shrink-0" name="check-circle" [size]="18" />
+              <span>
+                <strong>Inscripción encontrada</strong>
+                Código <strong class="tracking-wide text-lime">{{ ins.codigo }}</strong>
+              </span>
+            </div>
+
+            <div class="grid gap-4 lg:grid-cols-2">
+              <dl class="data-list self-start">
+                <div class="data-row">
+                  <dt>Personas</dt>
+                  <dd>{{ ins.personas.length }}</dd>
+                </div>
+                <div class="data-row">
+                  <dt>Transporte</dt>
+                  <dd>{{ ins.transporte === 'bus' ? 'Bus' : 'Vehículo propio' }}</dd>
+                </div>
+                <div class="data-row">
+                  <dt>Valor total</dt>
+                  <dd>{{ ins.totalAPagar | pesos }}</dd>
+                </div>
+                <div class="data-row">
+                  <dt>Total pagado</dt>
+                  <dd>{{ ins.totalPagado | pesos }}</dd>
+                </div>
+                <div class="data-row">
+                  <dt>Falta por pagar</dt>
+                  <dd [class.text-aviso]="ins.saldoPendiente > 0">
+                    {{ ins.saldoPendiente | pesos }}
+                  </dd>
+                </div>
+              </dl>
+
+              <!-- ====== Quiénes faltan por cerrar ====== -->
+              @if (conSaldo().length) {
+                <div class="card-flush self-start">
+                  <header class="card-head">
+                    <h3 class="card-title">
+                      <app-icon name="users" [size]="17" />
+                      Faltan por cerrar ({{ conSaldo().length }})
+                    </h3>
+                    <span class="badge badge-warn">{{ faltaTotal() | pesos }}</span>
+                  </header>
+
+                  <ul class="grid gap-px bg-white/10">
+                    @for (persona of conSaldo(); track persona.id) {
+                      <li class="flex items-center gap-3 bg-green-dark px-4 py-2.5">
+                        <div class="min-w-0 flex-1">
+                          <p class="truncate text-sm font-semibold">{{ persona.nombreCompleto }}</p>
+                          <p class="text-xs text-muted">
+                            {{ persona.tipoDocumento }} {{ persona.documento }}
+                          </p>
+                        </div>
+                        <span class="shrink-0 text-sm font-bold text-aviso">
+                          {{ persona.saldoPendiente | pesos }}
+                        </span>
+                      </li>
+                    }
+                  </ul>
+
+                  <p class="border-t border-white/10 px-4 py-3 text-xs text-muted">
+                    Un solo pago de {{ faltaTotal() | pesos }} cierra a todas estas personas: el
+                    dinero se reparte automáticamente entre quienes tengan saldo.
+                  </p>
+                </div>
+              } @else {
+                <div class="alerta alerta-ok self-start">
+                  <app-icon class="mt-0.5 shrink-0" name="check" [size]="18" />
+                  <span>
+                    <strong>Esta inscripción ya está completa.</strong>
+                    No hay saldo pendiente por pagar.
+                  </span>
+                </div>
+              }
+            </div>
+
+            <div class="mt-4 flex flex-wrap gap-3">
+              @if (ins.saldoPendiente > 0) {
+                <button class="btn btn-lime flex-1 basis-52" type="button" (click)="irAPagar()">
+                  Realizar un pago o abono
+                  <app-icon name="arrow-right" [size]="17" />
+                </button>
+              }
+              <button
+                class="btn btn-outline flex-1 basis-52"
+                type="button"
+                (click)="volverABuscar()"
+              >
+                Buscar otra inscripción
+              </button>
+            </div>
+          </section>
+        }
+      }
+
+      <!-- ============================================================
+           3 · Elegir a quién se aplica y subir el comprobante
+           ============================================================ -->
+      @case ('pagar') {
+        <section class="animate-rise grid gap-4">
+          <div class="grid gap-2">
+            <h2 class="font-display text-lg font-extrabold">¿A quién se aplica el pago?</h2>
+            <p class="text-sm text-cream-dim">
+              Para cerrar toda la inscripción faltan
+              <strong class="text-aviso">{{ faltaTotal() | pesos }}</strong>. Elige la persona y
+              cómo quieres que se use el dinero.
+            </p>
+          </div>
+
+          <!-- ====== Persona ====== -->
+          @if (conSaldo().length > 1) {
+            <div class="campo max-w-lg">
+              <label class="campo-label" for="persona">Aplicar primero a</label>
+              <select
+                id="persona"
+                class="campo-control"
+                (change)="elegirPersona($any($event.target).value)"
+              >
+                @for (persona of conSaldo(); track persona.id) {
+                  <option [value]="persona.id">
+                    {{ persona.nombreCompleto }} · debe {{ persona.saldoPendiente | pesos }}
+                  </option>
+                }
+              </select>
+              <p class="campo-hint">
+                {{ conSaldo().length }} persona(s) con saldo pendiente
+              </p>
+            </div>
+
+            <!-- ====== Modo de reparto ====== -->
+            <fieldset class="border-0 p-0">
+              <legend class="campo-label mb-2 p-0">¿Qué hacer si sobra dinero?</legend>
+              <div class="grid gap-2 sm:grid-cols-2 lg:max-w-2xl">
+                <label class="opcion-check items-start">
+                  <input
+                    class="mt-0.5"
+                    type="radio"
+                    name="modo"
+                    [checked]="modo() === 'repartir'"
+                    (change)="elegirModo('repartir')"
+                  />
+                  <span>
+                    Repartir entre los demás
+                    <span class="block text-xs text-muted">
+                      El excedente cierra a otras personas con saldo
+                    </span>
+                  </span>
+                </label>
+                <label class="opcion-check items-start">
+                  <input
+                    class="mt-0.5"
+                    type="radio"
+                    name="modo"
+                    [checked]="modo() === 'solo'"
+                    (change)="elegirModo('solo')"
+                  />
+                  <span>
+                    Solo a esta persona
+                    <span class="block text-xs text-muted">
+                      El excedente queda a favor de la inscripción
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </fieldset>
+          }
+
+          <app-tarjeta-pago />
+
+          <h2 class="mt-2 font-display text-lg font-extrabold">Sube el comprobante</h2>
+          <app-subir-comprobante (confirmado)="comprobanteConfirmado($event)" />
+
+          <button class="btn btn-ghost w-fit" type="button" (click)="volverABuscar()">
+            <app-icon name="arrow-left" [size]="16" />
+            Cancelar
+          </button>
+        </section>
+      }
+
+      <!-- ============================================================
+           4 · Confirmar el reparto antes de registrarlo
+           ============================================================ -->
+      @case ('confirmar') {
+        @if (comprobante(); as comp) {
+          <section class="animate-rise grid gap-4">
+            <div class="alerta alerta-ok">
+              <app-icon class="mt-0.5 shrink-0" name="check-circle" [size]="18" />
+              <span>
+                <strong>Pago verificado por {{ comp.valorEnviado | pesos }}</strong>
+                Revisa cómo se va a aplicar antes de registrarlo.
+              </span>
+            </div>
+
+            <div class="card-flush">
+              <header class="card-head">
+                <h3 class="card-title">
+                  <app-icon name="users" [size]="17" />
+                  Así se va a repartir
+                </h3>
+                @if (cerrara() > 0) {
+                  <span class="badge badge-ok">Cierra {{ cerrara() }} persona(s)</span>
+                } @else {
+                  <span class="badge badge-warn">No cierra a nadie</span>
+                }
+              </header>
+
+              <ul class="grid gap-px bg-white/10">
+                @for (linea of reparto(); track linea.persona.id) {
+                  <li class="grid gap-1 bg-green-dark px-4 py-3">
+                    <div class="flex items-center justify-between gap-3">
+                      <p class="min-w-0 flex-1 truncate text-sm font-semibold">
+                        {{ linea.persona.nombreCompleto }}
+                      </p>
+                      @if (linea.cierra) {
+                        <span class="badge badge-ok">Queda completa</span>
+                      } @else if (linea.aplicado > 0) {
+                        <span class="badge badge-warn">Abono parcial</span>
+                      } @else {
+                        <span class="badge badge-neutral">Sin cambio</span>
+                      }
+                    </div>
+                    <div class="flex flex-wrap gap-x-4 text-xs text-muted">
+                      <span>Debía {{ linea.persona.saldoPendiente | pesos }}</span>
+                      <span class="text-lime">Se le aplica {{ linea.aplicado | pesos }}</span>
+                      <span>
+                        Queda debiendo
+                        <span [class.text-exito]="linea.saldoFinal === 0">
+                          {{ linea.saldoFinal | pesos }}
+                        </span>
+                      </span>
+                    </div>
+                  </li>
+                }
+              </ul>
+
+              @if (sobrante() > 0) {
+                <p class="border-t border-white/10 px-4 py-3 text-xs text-aviso">
+                  Sobran {{ sobrante() | pesos }} que quedan como saldo a favor de la inscripción.
+                </p>
+              }
+            </div>
+
+            <div class="flex flex-wrap gap-3">
+              <button
+                class="btn btn-outline flex-1 basis-44"
+                type="button"
+                (click)="volverAlPago()"
+              >
+                <app-icon name="arrow-left" [size]="17" />
+                Cambiar
+              </button>
+              <button
+                class="btn btn-lime flex-1 basis-44"
+                type="button"
+                [disabled]="registrando()"
+                (click)="registrarPago()"
+              >
+                @if (registrando()) {
+                  <span class="spinner"></span>
+                  Registrando…
+                } @else {
+                  Registrar el pago
+                  <app-icon name="check" [size]="17" />
+                }
+              </button>
+            </div>
+          </section>
+        }
+      }
+
+      <!-- ============================================================
+           5 · Resultado
+           ============================================================ -->
+      @case ('listo') {
+        @if (inscripcion(); as ins) {
+          <section class="animate-rise grid gap-3">
+            <div class="alerta alerta-ok">
+              <app-icon class="mt-0.5 shrink-0" name="check-circle" [size]="18" />
+              <span>
+                <strong>El pago fue registrado correctamente.</strong>
+                @if (cerradasAhora().length) {
+                  Con este abono quedaron completas
+                  <strong class="text-exito">{{ cerradasAhora().length }}</strong> persona(s):
+                  <span class="text-cream">
+                    @for (p of cerradasAhora(); track p.id; let ultimo = $last) {
+                      {{ p.nombreCompleto }}{{ ultimo ? '.' : ', ' }}
+                    }
+                  </span>
+                } @else {
+                  Este es el nuevo estado de tu inscripción.
+                }
+              </span>
+            </div>
+
+            @if (ins.saldoPendiente === 0) {
+              <div class="alerta alerta-ok">
+                <app-icon class="mt-0.5 shrink-0" name="check" [size]="18" />
+                <span>
+                  <strong>Inscripción cerrada por completo.</strong>
+                  Todas las personas quedaron con el pago al día.
+                </span>
+              </div>
+            } @else {
+              <div class="alerta alerta-warn">
+                <app-icon class="mt-0.5 shrink-0" name="info" [size]="18" />
+                <span>
+                  <strong>Aún falta {{ ins.saldoPendiente | pesos }}</strong>
+                  para cerrar {{ conSaldo().length }} persona(s). Puedes registrar otro abono cuando
+                  quieras.
+                </span>
+              </div>
+            }
+
+            <dl class="data-list">
+              <div class="data-row">
+                <dt>Valor total</dt>
+                <dd>{{ ins.totalAPagar | pesos }}</dd>
+              </div>
+              <div class="data-row">
+                <dt>Total pagado</dt>
+                <dd>{{ ins.totalPagado | pesos }}</dd>
+              </div>
+              <div class="data-row">
+                <dt>Saldo pendiente</dt>
+                <dd [class.text-aviso]="ins.saldoPendiente > 0">
+                  {{ ins.saldoPendiente | pesos }}
+                </dd>
+              </div>
+              <div class="data-row">
+                <dt>Estado</dt>
+                <dd>
+                  @if (ins.estado === 'completada') {
+                    <span class="badge badge-ok">Inscripción completada</span>
+                  } @else {
+                    <span class="badge badge-warn">Inscripción activa</span>
+                  }
+                </dd>
+              </div>
+            </dl>
+
+            <h2 class="mt-3 font-display text-lg font-extrabold">Detalle por persona</h2>
+            <ul class="grid gap-2">
+              @for (persona of ins.personas; track persona.id) {
+                <li
+                  class="flex items-center gap-3 rounded-xl border border-white/10
+                         bg-white/[0.035] px-4 py-3"
+                >
+                  <span
+                    class="grid size-9 shrink-0 place-items-center rounded-full bg-white/8
+                           text-cream-dim"
+                  >
+                    <app-icon name="user" [size]="18" />
+                  </span>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-sm font-bold">{{ persona.nombreCompleto }}</p>
+                    <p class="text-xs text-muted">
+                      Pagado {{ persona.valorPagado | pesos }} · Saldo
+                      {{ persona.saldoPendiente | pesos }}
+                    </p>
+                  </div>
+                  @if (persona.estado === 'completo') {
+                    <span class="badge badge-ok">Completo</span>
+                  } @else {
+                    <span class="badge badge-warn">Abono</span>
+                  }
+                </li>
+              }
+            </ul>
+
+            <div class="mt-4 flex flex-wrap gap-3">
+              <a class="btn btn-lime flex-1 basis-44" routerLink="/">Volver al inicio</a>
+              @if (ins.saldoPendiente > 0) {
+                <button class="btn btn-outline flex-1 basis-44" type="button" (click)="irAPagar()">
+                  Registrar otro abono
+                </button>
+              }
+            </div>
+          </section>
+        }
+      }
+    }
+  </div>
+</main>
+
+<app-pie />
+<app-whatsapp-flotante />

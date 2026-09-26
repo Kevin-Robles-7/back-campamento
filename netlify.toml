@@ -1,0 +1,50 @@
+# ============================================================
+#  Netlify · frontend Angular
+#  Poner en la raiz del repositorio.
+# ============================================================
+
+[build]
+  base = "frontend"
+  command = "npm ci && npx ng build"
+  publish = "dist/frontend/browser"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# La API vive en Render. Este proxy evita configurar CORS y deja que el
+# frontend llame a /api/... como si fuera del mismo dominio.
+# Cambia la URL por la de tu servicio de Render.
+[[redirects]]
+  from = "/api/*"
+  to = "https://campamento-api.onrender.com/api/:splat"
+  status = 200
+  force = true
+
+# Angular es una SPA: cualquier ruta desconocida la resuelve el router.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# Los archivos con hash en el nombre se pueden cachear para siempre.
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/img/*"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"

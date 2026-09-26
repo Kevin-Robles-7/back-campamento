@@ -1,0 +1,272 @@
+<div class="grid gap-4">
+  <!-- ============================================================
+       Zona de carga
+       ============================================================ -->
+  @if (!archivo()) {
+    <label
+      class="grid cursor-pointer justify-items-center gap-2 rounded-2xl border-2 border-dashed
+             px-5 py-8 text-center transition sm:py-11"
+      [class]="
+        arrastrando()
+          ? 'border-lime bg-lime/10'
+          : 'border-white/20 bg-green-dark hover:border-lime/60 hover:bg-lime/5'
+      "
+      (dragover)="alArrastrar($event, true)"
+      (dragleave)="alArrastrar($event, false)"
+      (drop)="alSoltar($event)"
+    >
+      <input
+        class="sr-only"
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/heic"
+        (change)="alSeleccionar($event)"
+      />
+      <span class="mb-2 grid size-14 place-items-center rounded-xl bg-lime/15 text-lime">
+        <app-icon name="file-text" [size]="30" />
+      </span>
+      <span class="max-w-[32ch] text-sm font-semibold">
+        Arrastra la captura de tu comprobante o haz clic para seleccionarla
+      </span>
+      <span class="text-xs text-muted">JPG, PNG o WEBP · máximo 8 MB</span>
+    </label>
+
+    @if (cuentasCampamento().length) {
+      <p class="text-xs text-muted">
+        El pago debe haberse enviado a
+        <span class="font-bold text-lime">{{ cuentasCampamento().join(' o ') }}</span
+        >. Leemos la captura automáticamente y verificamos la cuenta destino.
+      </p>
+    }
+  } @else {
+    <!-- ====== Archivo cargado ====== -->
+    <div
+      class="flex items-center gap-4 rounded-2xl border p-3 sm:p-4"
+      [class]="
+        analizando()
+          ? 'border-white/10 bg-white/[0.04]'
+          : aceptado()
+            ? 'border-exito/40 bg-exito/12'
+            : 'border-fallo/45 bg-fallo/12'
+      "
+    >
+      <div class="size-16 shrink-0 overflow-hidden rounded-xl bg-green-dark">
+        @if (vistaPrevia()) {
+          <img
+            class="size-full object-cover"
+            [src]="vistaPrevia()"
+            alt="Comprobante de pago cargado"
+          />
+        }
+      </div>
+
+      <div class="min-w-0 flex-1">
+        <p class="truncate text-sm font-semibold">{{ archivo()?.name }}</p>
+
+        @if (analizando()) {
+          <p class="flex items-center gap-2 text-xs text-cream-dim">
+            <span class="spinner"></span>
+            Leyendo el comprobante…
+          </p>
+        } @else if (aceptado()) {
+          <p class="flex flex-wrap items-center gap-x-2 text-xs text-exito">
+            <app-icon name="check-circle" [size]="15" />
+            Comprobante verificado
+            @if (confianza() !== null) {
+              <span class="text-muted">· lectura {{ confianza() }}%</span>
+            }
+          </p>
+        } @else {
+          <p class="flex items-center gap-2 text-xs text-fallo">
+            <app-icon name="alert" [size]="15" />
+            Comprobante rechazado
+          </p>
+        }
+      </div>
+
+      <button
+        class="grid size-8 shrink-0 cursor-pointer place-items-center rounded-full border
+               border-white/15 text-cream-dim transition hover:border-fallo/50 hover:text-fallo"
+        type="button"
+        (click)="quitar()"
+        aria-label="Quitar comprobante"
+      >
+        <app-icon name="x" [size]="16" />
+      </button>
+    </div>
+  }
+
+  @if (error()) {
+    <div class="alerta alerta-error" role="alert">
+      <app-icon class="mt-0.5 shrink-0" name="alert" [size]="18" />
+      <span>{{ error() }}</span>
+    </div>
+  }
+
+  <!-- ============================================================
+       Resultado del análisis
+       ============================================================ -->
+  @if (analizado()) {
+    @if (comprobante(); as datos) {
+      <!-- ====== Aceptado: imagen a la izquierda, datos a la derecha ====== -->
+      @if (aceptado()) {
+        <section class="animate-rise grid gap-3">
+          <div class="alerta alerta-ok">
+            <app-icon class="mt-0.5 shrink-0" name="check-circle" [size]="18" />
+            <span>
+              <strong>Pago verificado</strong>
+              El dinero llegó a la cuenta del campamento. Estos son los datos leídos de tu
+              comprobante.
+            </span>
+          </div>
+
+          <div class="grid gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+            <!-- Imagen del comprobante -->
+            <figure
+              class="grid content-start gap-2 overflow-hidden rounded-2xl border border-white/10
+                     bg-green-dark p-3"
+            >
+              @if (vistaPrevia()) {
+                <img
+                  class="max-h-[420px] w-full rounded-xl object-contain"
+                  [src]="vistaPrevia()"
+                  alt="Comprobante de pago verificado"
+                />
+              }
+              <figcaption class="text-center text-xs text-muted">
+                {{ archivo()?.name }}
+              </figcaption>
+            </figure>
+
+            <!-- Tabla de datos -->
+            <div class="card-flush self-start">
+              <header class="card-head">
+                <h3 class="card-title">
+                  <app-icon name="sparkles" [size]="17" />
+                  Datos de la transacción
+                </h3>
+                <span class="badge badge-ok">
+                  {{ origen() === 'ia' ? 'Leído con IA' : 'Lectura automática' }}
+                </span>
+              </header>
+
+              <dl class="grid gap-px bg-white/10">
+                <div class="data-row">
+                  <dt>Valor enviado</dt>
+                  <dd class="font-bold text-lime">{{ datos.valorEnviado | pesos }}</dd>
+                </div>
+                <div class="data-row">
+                  <dt>Número de transacción</dt>
+                  <dd class="break-all">{{ datos.numeroTransaccion }}</dd>
+                </div>
+                <div class="data-row">
+                  <dt>Banco de origen</dt>
+                  <dd>{{ datos.bancoOrigen ?? 'No detectado' }}</dd>
+                </div>
+                <div class="data-row">
+                  <dt>Banco de destino</dt>
+                  <dd>{{ datos.bancoDestino ?? 'No detectado' }}</dd>
+                </div>
+                <div class="data-row">
+                  <dt>Cuenta destino</dt>
+                  <dd class="flex items-center justify-end gap-1.5 break-all text-exito">
+                    <app-icon name="check" [size]="14" />
+                    {{ datos.llaveDestino }}
+                  </dd>
+                </div>
+                @if (datos.fechaTransaccion) {
+                  <div class="data-row">
+                    <dt>Fecha y hora</dt>
+                    <dd>{{ datos.fechaTransaccion }}</dd>
+                  </div>
+                }
+              </dl>
+            </div>
+          </div>
+
+          <p class="text-xs text-muted">
+            Los datos se toman directamente de la imagen y no se pueden modificar. Si algo no
+            coincide con tu comprobante, sube una captura más nítida.
+          </p>
+
+          <button class="btn btn-lime btn-block" type="button" (click)="continuar()">
+            Continuar
+            <app-icon name="arrow-right" [size]="17" />
+          </button>
+        </section>
+      } @else {
+        <!-- ====== Rechazado: motivos y qué hacer ====== -->
+        <section class="animate-rise grid gap-3">
+          <div class="alerta alerta-error" role="alert">
+            <app-icon class="mt-0.5 shrink-0" name="alert" [size]="18" />
+            <span>
+              <strong>No pudimos validar este comprobante</strong>
+              <ul class="mt-1.5 grid list-disc gap-1 pl-4">
+                @for (motivo of motivos(); track motivo.codigo) {
+                  <li>{{ motivo.mensaje }}</li>
+                }
+              </ul>
+            </span>
+          </div>
+
+          <!-- Lo que sí se logró leer, para que el usuario compare -->
+          <div class="card-flush">
+            <header class="card-head">
+              <h3 class="card-title">
+                <app-icon name="file-text" [size]="17" />
+                Lo que leímos de la imagen
+              </h3>
+              <span class="badge badge-neutral">Sin verificar</span>
+            </header>
+
+            <dl class="grid gap-px bg-white/10">
+              <div class="data-row">
+                <dt>Valor enviado</dt>
+                <dd>{{ datos.valorEnviado ? (datos.valorEnviado | pesos) : 'No detectado' }}</dd>
+              </div>
+              <div class="data-row">
+                <dt>Número de transacción</dt>
+                <dd class="break-all">{{ datos.numeroTransaccion ?? 'No detectado' }}</dd>
+              </div>
+              <div class="data-row">
+                <dt>Cuenta destino</dt>
+                <dd class="break-all" [class.text-fallo]="!!datos.llaveDestino">
+                  {{ datos.llaveDestino ?? 'No detectada' }}
+                </dd>
+              </div>
+              <div class="data-row">
+                <dt>Fecha y hora</dt>
+                <dd>{{ datos.fechaTransaccion ?? 'No detectada' }}</dd>
+              </div>
+            </dl>
+          </div>
+
+          @if (cuentasCampamento().length) {
+            <div class="alerta alerta-info">
+              <app-icon class="mt-0.5 shrink-0" name="key" [size]="18" />
+              <span>
+                <strong>Cuentas válidas del campamento</strong>
+                {{ cuentasCampamento().join(' · ') }}
+              </span>
+            </div>
+          }
+
+          <div class="flex flex-wrap gap-3">
+            <button class="btn btn-lime flex-1 basis-48" type="button" (click)="quitar()">
+              <app-icon name="upload" [size]="17" />
+              Subir otro comprobante
+            </button>
+            <a
+              class="btn btn-outline flex-1 basis-48"
+              [href]="whatsapp()"
+              target="_blank"
+              rel="noopener"
+            >
+              <app-icon name="whatsapp" [size]="17" />
+              Pedir ayuda
+            </a>
+          </div>
+        </section>
+      }
+    }
+  }
+</div>

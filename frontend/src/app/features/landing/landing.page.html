@@ -1,0 +1,442 @@
+<app-encabezado />
+
+<main id="contenido">
+  <!-- ============================================================
+       HERO
+       ============================================================ -->
+  <section class="relative isolate flex min-h-svh items-center overflow-hidden">
+    <!-- Foto de fondo con degradados para asegurar contraste del texto -->
+    <img
+      class="absolute inset-0 -z-20 size-full object-cover"
+      src="img/hero/hero.jpg"
+      alt="Piscina y naturaleza de la Finca Agua Viva"
+      fetchpriority="high"
+      decoding="async"
+    />
+    <div
+      class="absolute inset-0 -z-10
+             bg-[radial-gradient(75%_60%_at_20%_30%,rgba(7,17,15,0.55),transparent_70%)]"
+      aria-hidden="true"
+    ></div>
+    <div
+      class="absolute inset-0 -z-10 bg-linear-to-t from-dark via-dark/80 to-dark/45"
+      aria-hidden="true"
+    ></div>
+
+    <div class="shell grid w-full gap-10 py-28 lg:grid-cols-[1.1fr_minmax(340px,0.9fr)] lg:py-32">
+      <!-- ====== Texto principal ====== -->
+      <div class="grid content-center gap-5">
+        <p class="kicker">IPUC Bosque Popular</p>
+
+        <h1 class="font-display text-5xl leading-[0.98] font-black sm:text-6xl lg:text-7xl">
+          Nos vamos<br />
+          de <span class="text-lime">campamento</span>
+        </h1>
+
+        <p class="max-w-[46ch] text-lg text-cream-dim">
+          Dos días para desconectarnos de la rutina, compartir, disfrutar la naturaleza y vivir una
+          experiencia con propósito.
+        </p>
+
+        <p
+          class="inline-flex w-fit items-center rounded-full border border-lime/40 bg-lime/10
+                 px-4 py-2 font-display text-sm font-extrabold tracking-[0.14em] text-lime uppercase"
+        >
+          {{ config()?.fechaEvento ?? '7 y 8 de noviembre' }}
+        </p>
+
+        <!-- Datos rápidos -->
+        <ul class="grid gap-3 sm:grid-cols-3">
+          @for (
+            dato of [
+              { icono: 'map-pin', label: 'Lugar', valor: config()?.lugarEvento ?? 'Finca Agua Viva' },
+              { icono: 'bus', label: 'Valor en bus', valor: (tarifaBus() | pesos) },
+              { icono: 'wallet', label: 'Aparta desde', valor: (abonoMinimo() | pesos) }
+            ];
+            track dato.label
+          ) {
+            <li
+              class="flex items-center gap-3 rounded-xl border border-white/10 bg-dark/60
+                     px-4 py-2.5 backdrop-blur-sm"
+            >
+              <span class="text-lime"><app-icon [name]="dato.icono" [size]="18" /></span>
+              <span class="grid min-w-0 leading-tight">
+                <small class="text-xs text-muted">{{ dato.label }}</small>
+                <strong class="truncate text-sm">{{ dato.valor }}</strong>
+              </span>
+            </li>
+          }
+        </ul>
+      </div>
+
+      <!-- ====== Los tres accesos principales ====== -->
+      <div
+        class="grid content-start gap-3 self-center rounded-3xl border border-white/12
+               bg-dark/85 p-5 shadow-deep backdrop-blur-xl sm:p-6"
+        role="group"
+        aria-label="¿Qué deseas hacer?"
+      >
+        <p class="text-center font-display text-xl font-extrabold">¿Qué deseas hacer?</p>
+
+        <a class="btn-accion btn-accion-lime" routerLink="/inscripcion">
+          <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-lime/20 text-lime">
+            <app-icon name="clipboard" [size]="22" />
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="block font-display text-base font-bold">Inscribirme</span>
+            <span class="block text-sm leading-snug text-cream-dim">
+              Realizar una nueva inscripción
+            </span>
+          </span>
+          <app-icon class="shrink-0 text-lime" name="arrow-right" [size]="20" />
+        </a>
+
+        <a class="btn-accion btn-accion-muted" routerLink="/consultar">
+          <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-white/8 text-cream-dim">
+            <app-icon name="search" [size]="22" />
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="block font-display text-base font-bold">Consultar inscripción</span>
+            <span class="block text-sm leading-snug text-cream-dim">
+              Ver el estado y el saldo de tu inscripción
+            </span>
+          </span>
+          <app-icon class="shrink-0 text-lime" name="arrow-right" [size]="20" />
+        </a>
+
+        <a class="btn-accion btn-accion-muted" routerLink="/terminar">
+          <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-white/8 text-cream-dim">
+            <app-icon name="wallet" [size]="22" />
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="block font-display text-base font-bold">Terminar inscripción</span>
+            <span class="block text-sm leading-snug text-cream-dim">
+              Realizar un pago o actualizar datos
+            </span>
+          </span>
+          <app-icon class="shrink-0 text-lime" name="arrow-right" [size]="20" />
+        </a>
+
+        @if (store.hayBorrador()) {
+          <div class="alerta alerta-warn mt-1">
+            <app-icon class="mt-0.5 shrink-0" name="info" [size]="18" />
+            <span>
+              <strong>Tienes una inscripción sin terminar.</strong>
+              Continúa donde quedaste desde «Inscribirme».
+            </span>
+          </div>
+        }
+      </div>
+    </div>
+
+    <a
+      class="absolute inset-x-0 bottom-5 mx-auto w-fit text-xs tracking-[0.2em] text-cream-dim
+             uppercase transition hover:text-lime"
+      routerLink="/"
+      fragment="pasos"
+    >
+      {{ config()?.lugarEvento ?? 'Finca Agua Viva' }}
+      <span class="ml-1 inline-block animate-bounce" aria-hidden="true">↓</span>
+    </a>
+  </section>
+
+  <!-- ============================================================
+       PASOS
+       ============================================================ -->
+  <section class="py-20 lg:py-28" id="pasos">
+    <div class="shell">
+      <header class="mb-10 grid max-w-[68ch] gap-3">
+        <p class="kicker">Es muy fácil</p>
+        <h2 class="titulo-seccion">¿Cómo apartar <strong>tu cupo?</strong></h2>
+        <p class="lead">
+          Sigue estos cuatro pasos y asegura tu lugar. Todo el proceso toma unos minutos y puedes
+          revisar la información antes de confirmar.
+        </p>
+      </header>
+
+      <ol class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        @for (paso of pasos; track paso.numero) {
+          <li
+            class="group relative grid content-start gap-2 rounded-2xl border border-white/10
+                   bg-white/[0.035] p-5 transition-all duration-200
+                   hover:-translate-y-1 hover:border-lime/40"
+          >
+            <span
+              class="absolute top-4 right-5 font-display text-4xl leading-none font-black
+                     text-lime/12 transition group-hover:text-lime/25"
+              aria-hidden="true"
+            >
+              {{ paso.numero }}
+            </span>
+            <span class="mb-1 grid size-11 place-items-center rounded-xl bg-lime/15 text-lime">
+              <app-icon [name]="paso.icono" [size]="22" />
+            </span>
+            <h3 class="font-display text-lg font-bold">{{ paso.titulo }}</h3>
+            <p class="text-sm text-cream-dim">{{ paso.texto }}</p>
+          </li>
+        }
+      </ol>
+
+      <div class="alerta alerta-info mt-6">
+        <app-icon class="mt-0.5 shrink-0" name="users" [size]="18" />
+        <span>
+          <strong>Con un solo pago puedes inscribir a varias personas.</strong>
+          El sistema calcula cuántos cupos completos alcanza tu pago y cuántos quedan con abono.
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       TARIFAS
+       ============================================================ -->
+  <section class="border-y border-white/10 bg-dark-soft py-20 lg:py-28" id="tarifas">
+    <div class="shell">
+      <header class="mb-10 grid max-w-[68ch] gap-3">
+        <p class="kicker">Valores por persona</p>
+        <h2 class="titulo-seccion">Elige cómo <strong>viajar</strong></h2>
+        <p class="lead">
+          El valor depende del transporte que elijas. Lo seleccionas durante la inscripción.
+        </p>
+      </header>
+
+      <div class="grid gap-4 sm:grid-cols-3">
+        <article
+          class="grid justify-items-center gap-2 rounded-2xl border border-white/10
+                 bg-white/[0.035] px-5 py-8 text-center"
+        >
+          <span class="grid size-14 place-items-center rounded-full bg-lime/15 text-lime">
+            <app-icon name="bus" [size]="26" />
+          </span>
+          <h3 class="font-display text-lg font-bold">Viaje en bus</h3>
+          <p class="font-display text-3xl leading-none font-black text-lime">
+            {{ tarifaBus() | pesos }}
+          </p>
+          <p class="text-xs text-muted">por persona · transporte incluido</p>
+        </article>
+
+        <article
+          class="relative grid justify-items-center gap-2 rounded-2xl border border-lime/40
+                 bg-linear-to-b from-lime/12 to-white/[0.03] px-5 py-8 text-center shadow-soft"
+        >
+          <span class="badge badge-lime absolute -top-3">Más económico</span>
+          <span class="grid size-14 place-items-center rounded-full bg-lime/20 text-lime">
+            <app-icon name="car" [size]="26" />
+          </span>
+          <h3 class="font-display text-lg font-bold">Vehículo propio</h3>
+          <p class="font-display text-3xl leading-none font-black text-lime">
+            {{ tarifaVehiculo() | pesos }}
+          </p>
+          <p class="text-xs text-muted">por persona · tú te transportas</p>
+        </article>
+
+        <article
+          class="grid justify-items-center gap-2 rounded-2xl border border-white/10
+                 bg-white/[0.035] px-5 py-8 text-center"
+        >
+          <span class="grid size-14 place-items-center rounded-full bg-aviso/15 text-aviso">
+            <app-icon name="target" [size]="26" />
+          </span>
+          <h3 class="font-display text-lg font-bold">Abono mínimo</h3>
+          <p class="font-display text-3xl leading-none font-black text-aviso">
+            {{ abonoMinimo() | pesos }}
+          </p>
+          <p class="text-xs text-muted">aparta tu cupo y paga el resto después</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       GALERÍA
+       ============================================================ -->
+  <section class="py-20 lg:py-28" id="galeria">
+    <div class="shell">
+      <header class="mb-8 flex flex-wrap items-end justify-between gap-5">
+        <div class="grid max-w-[60ch] gap-3">
+          <p class="kicker">Un adelanto de lo que viviremos</p>
+          <h2 class="titulo-seccion">Nuestra <strong>galería</strong></h2>
+          <p class="lead">
+            Un espacio rodeado de naturaleza, piscina y zonas para compartir. Mira un adelanto del
+            lugar que nos espera.
+          </p>
+          <ul class="flex flex-wrap gap-2">
+            @for (etiqueta of etiquetasGaleria; track etiqueta) {
+              <li class="badge badge-neutral">{{ etiqueta }}</li>
+            }
+          </ul>
+        </div>
+
+        <!-- Controles del carrusel -->
+        <div class="flex gap-2">
+          <button
+            class="grid size-11 cursor-pointer place-items-center rounded-full border
+                   border-white/15 text-cream transition hover:border-lime hover:text-lime"
+            type="button"
+            (click)="desplazar(-1)"
+            aria-label="Ver fotos anteriores"
+          >
+            <app-icon name="arrow-left" [size]="18" />
+          </button>
+          <button
+            class="grid size-11 cursor-pointer place-items-center rounded-full border
+                   border-white/15 text-cream transition hover:border-lime hover:text-lime"
+            type="button"
+            (click)="desplazar(1)"
+            aria-label="Ver más fotos"
+          >
+            <app-icon name="arrow-right" [size]="18" />
+          </button>
+        </div>
+      </header>
+    </div>
+
+    <!-- Pista deslizable con scroll-snap: funciona con dedo, rueda y teclado -->
+    <ul
+      #pista
+      class="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-5
+             [scrollbar-width:none] sm:px-7 lg:px-10 [&::-webkit-scrollbar]:hidden"
+      tabindex="0"
+      aria-label="Fotos de la Finca Agua Viva"
+    >
+      @for (item of galeria; track item.archivo; let i = $index) {
+        <li
+          class="w-[78vw] shrink-0 snap-center sm:w-[46vw] lg:w-[30vw] xl:w-[22rem]"
+        >
+          @if (imagenFallida(item.archivo)) {
+            <div
+              class="grid aspect-4/3 place-items-center overflow-hidden rounded-2xl border
+                     border-white/10 bg-linear-to-br from-green to-green-dark text-lime/40"
+              role="img"
+              [attr.aria-label]="item.alt"
+            >
+              <app-icon name="leaf" [size]="28" />
+            </div>
+          } @else {
+            <button
+              class="group relative block w-full cursor-zoom-in overflow-hidden rounded-2xl
+                     border border-white/10 transition hover:border-lime/50"
+              type="button"
+              (click)="abrirVisor(i)"
+              [attr.aria-label]="'Ampliar foto: ' + item.alt"
+            >
+              <img
+                class="aspect-4/3 size-full object-cover transition-transform duration-500
+                       group-hover:scale-105"
+                [src]="item.archivo"
+                [alt]="item.alt"
+                loading="lazy"
+                decoding="async"
+                (error)="marcarFallida(item.archivo)"
+              />
+              <!-- Indicador de ampliar -->
+              <span
+                class="absolute inset-0 grid place-items-center bg-dark/45 opacity-0
+                       transition group-hover:opacity-100"
+                aria-hidden="true"
+              >
+                <span class="grid size-11 place-items-center rounded-full bg-lime text-dark">
+                  <app-icon name="search" [size]="20" [grosor]="2.2" />
+                </span>
+              </span>
+            </button>
+          }
+        </li>
+      }
+    </ul>
+  </section>
+
+  <!-- ============================================================
+       INFORMACIÓN
+       ============================================================ -->
+  <section class="border-y border-white/10 bg-dark-soft py-20 lg:py-28" id="info">
+    <div class="shell grid items-start gap-10 lg:grid-cols-2">
+      <div class="grid gap-3">
+        <p class="kicker">Todo lo que necesitas saber</p>
+        <h2 class="titulo-seccion">Información del <strong>campamento</strong></h2>
+        <p class="lead">
+          Si te queda alguna duda escríbenos por WhatsApp y con gusto te ayudamos.
+        </p>
+        <a
+          class="btn btn-lime mt-3 w-fit"
+          [href]="whatsapp()"
+          target="_blank"
+          rel="noopener"
+        >
+          <app-icon name="whatsapp" [size]="18" />
+          Preguntar por WhatsApp
+        </a>
+      </div>
+
+      <dl class="data-list">
+        <div class="data-row">
+          <dt>Fecha</dt>
+          <dd>{{ config()?.fechaEvento ?? '7 y 8 de noviembre' }}</dd>
+        </div>
+        <div class="data-row">
+          <dt>Lugar</dt>
+          <dd>{{ config()?.lugarEvento ?? 'Finca Agua Viva' }}</dd>
+        </div>
+        <div class="data-row">
+          <dt>Organiza</dt>
+          <dd>IPUC Bosque Popular</dd>
+        </div>
+        <div class="data-row">
+          <dt>Valor en bus</dt>
+          <dd>{{ tarifaBus() | pesos }}</dd>
+        </div>
+        <div class="data-row">
+          <dt>Valor en vehículo propio</dt>
+          <dd>{{ tarifaVehiculo() | pesos }}</dd>
+        </div>
+        <div class="data-row">
+          <dt>Abono mínimo</dt>
+          <dd>{{ abonoMinimo() | pesos }}</dd>
+        </div>
+        @if (config()?.llavePago) {
+          <div class="data-row">
+            <dt>Llave para pagar</dt>
+            <dd class="text-lime">{{ config()?.llavePago }}</dd>
+          </div>
+        }
+      </dl>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       CIERRE
+       ============================================================ -->
+  <section
+    class="bg-[radial-gradient(70%_100%_at_50%_100%,rgba(199,255,61,0.12),transparent_70%)]
+           py-20 lg:py-28"
+  >
+    <div class="shell grid justify-items-center gap-3 text-center">
+      <p class="kicker">Tu lugar te espera</p>
+      <h2 class="titulo-seccion">Inscríbete al <strong>campamento</strong></h2>
+      <p class="lead mb-4">
+        Ten tu documento de identidad y el comprobante de pago a la mano.
+      </p>
+
+      <div class="flex flex-wrap justify-center gap-3">
+        <a class="btn btn-lime" routerLink="/inscripcion">
+          Inscribirme ahora
+          <app-icon name="arrow-right" [size]="17" />
+        </a>
+        <a class="btn btn-outline" routerLink="/consultar">Consultar inscripción</a>
+        <a class="btn btn-outline" routerLink="/terminar">Terminar inscripción</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<app-pie />
+<app-whatsapp-flotante />
+
+<!-- Visor de fotos a pantalla completa -->
+@if (fotoAbierta() !== null) {
+  <app-visor-galeria
+    [fotos]="galeria"
+    [inicial]="fotoAbierta()!"
+    (cerrar)="cerrarVisor()"
+  />
+}

@@ -1,0 +1,24 @@
+# Dependencias
+node_modules/
+
+# Entorno: nunca se sube
+.env
+.env.*
+!.env.example
+
+# Compilados
+dist/
+.angular/
+
+# Archivos subidos en desarrollo
+backend/uploads/
+
+# Sistema
+.DS_Store
+*.log
+
+# Insumos de trabajo (documentos originales, capturas)
+images/
+
+# Local Netlify folder
+.netlify

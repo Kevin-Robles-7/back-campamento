@@ -1,0 +1,308 @@
+<div class="grid min-h-svh grid-rows-[auto_1fr]">
+  <!-- ============================================================
+       Cabecera del asistente
+       ============================================================ -->
+  <header
+    class="sticky top-0 z-40 grid gap-3 border-b border-white/10 bg-dark/92 py-4 backdrop-blur-lg"
+  >
+    <div class="shell flex items-center gap-3">
+      <button
+        class="grid size-10 shrink-0 cursor-pointer place-items-center rounded-xl border
+               border-white/15 text-cream-dim transition hover:border-lime/40 hover:text-lime"
+        type="button"
+        (click)="atras()"
+        aria-label="Volver"
+      >
+        <app-icon name="arrow-left" [size]="20" />
+      </button>
+      <h1 class="min-w-0 flex-1 truncate font-display text-lg font-bold">{{ titulo() }}</h1>
+      <p class="shrink-0 text-xs whitespace-nowrap text-muted">
+        Paso {{ store.paso() }} de {{ store.totalPasos }}
+      </p>
+    </div>
+    <div class="shell">
+      <app-stepper [actual]="store.paso()" [total]="store.totalPasos" [desde]="1" />
+    </div>
+  </header>
+
+  <main
+    class="mx-auto grid w-full content-start gap-4 px-4 py-8 pb-20 sm:px-6 lg:px-8"
+    [class]="store.paso() === 2 || store.paso() === 4 ? 'max-w-[1360px]' : 'max-w-4xl'"
+    id="contenido"
+  >
+    @if (error()) {
+      <div class="alerta alerta-error" role="alert">
+        <app-icon class="mt-0.5 shrink-0" name="alert" [size]="18" />
+        <span>{{ error() }}</span>
+      </div>
+    }
+
+    @switch (store.paso()) {
+      <!-- ============================================================
+           PASO 2 · Subir comprobante
+           ============================================================ -->
+      @case (2) {
+        <section class="animate-rise grid gap-4">
+          <div class="grid gap-2">
+            <h2 class="font-display text-2xl font-extrabold">Sube tu comprobante de pago</h2>
+            <p class="text-sm text-cream-dim">
+              Carga la imagen de tu transacción. La leemos automáticamente y verificamos que el pago
+              se haya enviado a la cuenta del campamento.
+            </p>
+          </div>
+
+          <app-tarjeta-pago />
+
+          <app-subir-comprobante (confirmado)="comprobanteConfirmado($event)" />
+
+          @if (cargandoAnalisis()) {
+            <p class="flex items-center gap-2 text-sm text-cream-dim">
+              <span class="spinner"></span>
+              Analizando tu pago…
+            </p>
+          }
+        </section>
+      }
+
+      <!-- ============================================================
+           PASO 3 · Validación y transporte
+           ============================================================ -->
+      @case (3) {
+        <section class="animate-rise grid gap-4">
+          <div class="alerta alerta-ok">
+            <app-icon class="mt-0.5 shrink-0" name="check-circle" [size]="18" />
+            <span>
+              <strong>Comprobante válido</strong>
+              El pago llegó a la cuenta del campamento y quedó registrado.
+            </span>
+          </div>
+
+          <h2 class="font-display text-xl font-extrabold">Detalle de la transacción</h2>
+          <dl class="data-list">
+            <div class="data-row">
+              <dt>Valor enviado</dt>
+              <dd class="text-lime">{{ store.comprobante()?.valorEnviado | pesos }}</dd>
+            </div>
+            <div class="data-row">
+              <dt>Número de transacción</dt>
+              <dd>{{ store.comprobante()?.numeroTransaccion ?? '—' }}</dd>
+            </div>
+            <div class="data-row">
+              <dt>Banco de origen</dt>
+              <dd>{{ store.comprobante()?.bancoOrigen ?? '—' }}</dd>
+            </div>
+            <div class="data-row">
+              <dt>Banco de destino</dt>
+              <dd>{{ store.comprobante()?.bancoDestino ?? '—' }}</dd>
+            </div>
+            <div class="data-row">
+              <dt>Cuenta destino</dt>
+              <dd class="break-all">{{ store.comprobante()?.llaveDestino ?? '—' }}</dd>
+            </div>
+          </dl>
+
+          <h2 class="mt-4 font-display text-xl font-extrabold">Tarifas y cupos</h2>
+          <p class="-mt-2 text-sm text-cream-dim">
+            Cada persona elige su transporte en el siguiente paso, así que puedes mezclar: por
+            ejemplo tres en bus y dos en vehículo propio.
+          </p>
+
+          @let opciones = store.analisis()?.opciones;
+
+          <div class="grid gap-3 sm:grid-cols-2">
+            <article
+              class="grid justify-items-center gap-1 rounded-2xl border border-white/12
+                     bg-white/[0.035] px-4 py-6"
+            >
+              <app-icon name="bus" [size]="26" />
+              <span class="mt-2 font-display text-base font-bold">En bus</span>
+              <span class="font-display text-2xl font-black text-lime">
+                {{ opciones?.bus?.tarifa | pesos }}
+              </span>
+              <span class="text-xs text-muted">por persona</span>
+              @if (opciones?.bus; as cap) {
+                <span class="mt-2 text-center text-xs text-cream-dim">
+                  Tu pago cubre
+                  <strong class="text-lime">{{ cap.personasCompletas }}</strong> cupo(s) completo(s)
+                </span>
+              }
+            </article>
+
+            <article
+              class="grid justify-items-center gap-1 rounded-2xl border border-white/12
+                     bg-white/[0.035] px-4 py-6"
+            >
+              <app-icon name="car" [size]="26" />
+              <span class="mt-2 font-display text-base font-bold">Vehículo propio</span>
+              <span class="font-display text-2xl font-black text-lime">
+                {{ opciones?.vehiculoPropio?.tarifa | pesos }}
+              </span>
+              <span class="text-xs text-muted">por persona</span>
+              @if (opciones?.vehiculoPropio; as cap) {
+                <span class="mt-2 text-center text-xs text-cream-dim">
+                  Tu pago cubre
+                  <strong class="text-lime">{{ cap.personasCompletas }}</strong> cupo(s) completo(s)
+                </span>
+              }
+            </article>
+          </div>
+
+          @if (store.analisis()?.opciones?.bus; as cap) {
+            <div class="alerta alerta-info animate-rise">
+              <app-icon class="mt-0.5 shrink-0" name="users" [size]="18" />
+              <span>
+                <strong>Con {{ cap.valorEnviado | pesos }} puedes inscribir:</strong>
+                <ul class="mt-1 grid list-disc gap-1 pl-4">
+                  <li>
+                    Hasta <strong class="text-lime">{{ cap.maximoConAbono }}</strong> persona(s)
+                    abonando {{ cap.abonoMinimo | pesos }} cada una
+                  </li>
+                  <li>
+                    O menos personas con cupos completos, mezclando bus y vehículo propio como
+                    necesites
+                  </li>
+                </ul>
+                <span class="mt-2 block text-xs text-muted">
+                  Todo el pago debe quedar repartido entre las personas que registres.
+                </span>
+              </span>
+            </div>
+          }
+
+          <div class="mt-4 flex flex-wrap gap-3">
+            <button class="btn btn-outline flex-1 basis-44" type="button" (click)="atras()">
+              <app-icon name="arrow-left" [size]="17" />
+              Anterior
+            </button>
+            <button
+              class="btn btn-lime flex-1 basis-44"
+              type="button"
+              (click)="continuarDesdeValidacion()"
+            >
+              Continuar
+              <app-icon name="arrow-right" [size]="17" />
+            </button>
+          </div>
+        </section>
+      }
+
+      <!-- ============================================================
+           PASO 4 · Personas
+           ============================================================ -->
+      @case (4) {
+        <section class="animate-rise grid gap-4">
+          <h2 class="font-display text-xl font-extrabold">Personas a registrar</h2>
+
+          <app-paso-personas
+            [tarifaBus]="tarifaBus()"
+            [tarifaVehiculo]="tarifaVehiculo()"
+            [valorPagado]="store.valorPagado()"
+            [abonoMinimo]="abonoMinimo()"
+            [personasIniciales]="store.personas()"
+            [fechaEvento]="config()?.fechaEvento ?? ''"
+            [enviando]="enviando()"
+            (atras)="atras()"
+            (confirmar)="registrar($event)"
+          />
+        </section>
+      }
+
+      <!-- ============================================================
+           PASO 5 · Resumen
+           ============================================================ -->
+      @case (5) {
+        @if (store.inscripcion(); as inscripcion) {
+          <section class="animate-rise grid gap-4">
+            <div class="alerta alerta-ok">
+              <app-icon class="mt-0.5 shrink-0" name="check-circle" [size]="18" />
+              <span>
+                <strong>¡Inscripción registrada!</strong>
+                Guarda tu código:
+                <strong class="tracking-wide text-lime">{{ inscripcion.codigo }}</strong>
+              </span>
+            </div>
+
+            <h2 class="font-display text-xl font-extrabold">Personas registradas</h2>
+            <ul class="grid gap-2">
+              @for (persona of inscripcion.personas; track persona.id; let i = $index) {
+                <li
+                  class="flex items-center gap-3 rounded-xl border border-white/10
+                         bg-white/[0.035] px-4 py-3"
+                >
+                  <span
+                    class="grid size-8 shrink-0 place-items-center rounded-full bg-lime/15
+                           text-xs font-bold text-lime"
+                  >
+                    {{ i + 1 }}
+                  </span>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-sm font-bold">{{ persona.nombreCompleto }}</p>
+                    <p class="text-xs text-muted">
+                      {{ persona.tipoDocumento }} {{ persona.documento }} ·
+                      {{ persona.edad ?? '—' }} años · {{ persona.telefono }}
+                    </p>
+                    <p class="text-xs text-muted">
+                      {{ persona.transporte === 'bus' ? 'Bus' : 'Vehículo propio' }} · Pagado
+                      {{ persona.valorPagado | pesos }} · Saldo
+                      {{ persona.saldoPendiente | pesos }}
+                    </p>
+                  </div>
+                  @if (persona.estado === 'completo') {
+                    <span class="badge badge-ok">Completo</span>
+                  } @else {
+                    <span class="badge badge-warn">Abono</span>
+                  }
+                </li>
+              }
+            </ul>
+
+            <h2 class="mt-4 font-display text-xl font-extrabold">Totales de la inscripción</h2>
+            <dl class="data-list">
+              <div class="data-row">
+                <dt>Total de personas</dt>
+                <dd>{{ inscripcion.personas.length }}</dd>
+              </div>
+              <div class="data-row">
+                <dt>Transporte</dt>
+                <dd>{{ etiquetaTransporte(inscripcion.transporte) }}</dd>
+              </div>
+              <div class="data-row">
+                <dt>Valor total a pagar</dt>
+                <dd>{{ inscripcion.totalAPagar | pesos }}</dd>
+              </div>
+              <div class="data-row">
+                <dt>Total pagado</dt>
+                <dd>{{ inscripcion.totalPagado | pesos }}</dd>
+              </div>
+              <div class="data-row">
+                <dt>Saldo pendiente</dt>
+                <dd [class.text-aviso]="inscripcion.saldoPendiente > 0">
+                  {{ inscripcion.saldoPendiente | pesos }}
+                </dd>
+              </div>
+            </dl>
+
+            <div class="mt-4 flex flex-wrap justify-center gap-3">
+              <a class="btn btn-lime flex-1 basis-44" routerLink="/">Volver al inicio</a>
+              @if (inscripcion.saldoPendiente > 0) {
+                <a class="btn btn-outline flex-1 basis-44" routerLink="/terminar">
+                  Realizar un abono
+                </a>
+              }
+              <button
+                class="btn btn-outline flex-1 basis-44"
+                type="button"
+                (click)="nuevaInscripcion()"
+              >
+                Hacer otra inscripción
+              </button>
+            </div>
+          </section>
+        }
+      }
+    }
+  </main>
+</div>
+
+<app-pie />
+<app-whatsapp-flotante />
