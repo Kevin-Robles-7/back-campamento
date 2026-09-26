@@ -30,6 +30,13 @@ Reglas: valorEnviado en pesos colombianos como numero entero sin puntos ni simbo
 llaveDestino es el correo, celular o llave (@algo) que RECIBE el dinero.
 fechaTransaccion en formato ISO 8601. Si un dato no aparece usa null. No agregues texto fuera del JSON.`;
 
+/**
+ * Modelos a los que se recurre si el configurado falla. Los Flash-Lite leen
+ * comprobantes igual de bien que los Flash grandes, son más rápidos y su
+ * cuota gratuita es muchísimo más holgada.
+ */
+const MODELOS_RESPALDO = ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
+
 // ------------------------------------------------------------
 //  Tesseract: un worker reutilizable para todas las peticiones
 // ------------------------------------------------------------
@@ -92,9 +99,9 @@ function normalizar(datos) {
   };
 }
 
-async function conGemini(buffer, mimeType) {
+async function conGemini(buffer, mimeType, modelo = config.ocr.geminiModelo) {
   const base64 = buffer.toString('base64');
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.ocr.geminiModelo}:generateContent?key=${config.ocr.geminiApiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${config.ocr.geminiApiKey}`;
   const respuesta = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -105,9 +112,32 @@ async function conGemini(buffer, mimeType) {
       generationConfig: { temperature: 0, responseMimeType: 'application/json' },
     }),
   });
-  if (!respuesta.ok) throw new Error(`Gemini respondio ${respuesta.status}`);
+  if (!respuesta.ok) throw new Error(`Gemini (${modelo}) respondio ${respuesta.status}`);
   const json = await respuesta.json();
   return extraerJson(json?.candidates?.[0]?.content?.parts?.[0]?.text);
+}
+
+/**
+ * Llama a Gemini probando los modelos de respaldo si el principal está
+ * agotado (429), saturado (503) o retirado (404). El plan gratuito de los
+ * modelos Flash grandes es muy corto; los Flash-Lite aguantan mucho más.
+ */
+async function conGeminiTolerante(buffer, mimeType) {
+  const candidatos = [
+    config.ocr.geminiModelo,
+    ...MODELOS_RESPALDO.filter((m) => m !== config.ocr.geminiModelo),
+  ];
+
+  for (const modelo of candidatos) {
+    try {
+      const datos = normalizar(await conGemini(buffer, mimeType, modelo));
+      if (datos.valorEnviado) return datos;
+      console.warn(`[comprobantes] ${modelo} no encontró el valor; se prueba el siguiente`);
+    } catch (error) {
+      console.warn(`[comprobantes] ${error.message}; se prueba el siguiente modelo`);
+    }
+  }
+  return null;
 }
 
 async function conOpenai(buffer, mimeType) {
@@ -143,24 +173,86 @@ async function conOpenai(buffer, mimeType) {
 // ------------------------------------------------------------
 
 /**
+ * Campos que la validación necesita para aceptar un comprobante sin
+ * intervención humana: sin ellos hay que recurrir al modelo de visión.
+ */
+function estaCompleto(datos) {
+  return Boolean(
+    datos.valorEnviado && datos.numeroTransaccion && datos.llaveDestino && datos.fechaTransaccion,
+  );
+}
+
+/**
  * Analiza el comprobante y devuelve los datos detectados.
  * `requiereRevisionManual` indica que falta información clave y el usuario
  * debe completarla antes de continuar.
+ *
+ * Estrategias según `OCR_PROVIDER`:
+ *   auto   -> Tesseract primero (~0,4 s, sin red ni cuota) y solo si falta
+ *             algún campo se consulta a Gemini. Es la más rápida y la que
+ *             menos cuota gasta.
+ *   gemini -> Gemini primero, Tesseract como red de seguridad.
+ *   manual -> sin extracción automática.
  */
 export async function analizarComprobante({ buffer, mimeType }) {
   const esPdf = mimeType === 'application/pdf';
   const proveedor = config.ocr.provider;
+  const hayGemini = Boolean(config.ocr.geminiApiKey);
 
-  // 1) Modelo de visión, si está configurado.
-  if (proveedor === 'gemini' && config.ocr.geminiApiKey) {
+  // ---- Estrategia rápida: OCR local primero -------------------------
+  // Tesseract tarda una fracción de lo que tarda una llamada de red y no
+  // consume cuota. Si saca todos los campos, no hace falta nada más.
+  if (proveedor === 'auto' && !esPdf) {
+    let local = null;
     try {
-      const datos = normalizar(await conGemini(buffer, mimeType));
-      if (datos.valorEnviado) {
-        return { datos, origen: 'ia', requiereRevisionManual: false, texto: null };
+      const { texto, confianza } = await conTesseract(buffer);
+      const datos = normalizar(analizarTexto(texto));
+      local = { datos, confianza, texto };
+      if (estaCompleto(datos)) {
+        return {
+          datos,
+          origen: 'ocr',
+          confianza: Math.round(confianza),
+          requiereRevisionManual: false,
+          texto,
+        };
       }
+      const faltan = Object.entries({
+        valor: datos.valorEnviado,
+        transaccion: datos.numeroTransaccion,
+        llave: datos.llaveDestino,
+        fecha: datos.fechaTransaccion,
+      })
+        .filter(([, v]) => !v)
+        .map(([k]) => k);
+      console.log(`[comprobantes] OCR local no leyó: ${faltan.join(', ')} · se consulta el modelo`);
     } catch (error) {
-      console.warn('[comprobantes] Gemini falló:', error.message);
+      console.warn('[comprobantes] OCR local falló:', error.message);
     }
+
+    // Faltó algo: el modelo de visión completa la lectura.
+    if (hayGemini) {
+      const datos = await conGeminiTolerante(buffer, mimeType);
+      if (datos) return { datos, origen: 'ia', requiereRevisionManual: false, texto: null };
+    }
+
+    // Sin Gemini disponible se devuelve lo que sacó Tesseract.
+    if (local) {
+      return {
+        datos: local.datos,
+        origen: 'ocr',
+        confianza: Math.round(local.confianza),
+        requiereRevisionManual:
+          !local.datos.valorEnviado || !local.datos.numeroTransaccion,
+        texto: local.texto,
+      };
+    }
+  }
+
+  // ---- Estrategia con modelo de visión primero ----------------------
+  if (proveedor === 'gemini' && hayGemini) {
+    const datos = await conGeminiTolerante(buffer, mimeType);
+    if (datos) return { datos, origen: 'ia', requiereRevisionManual: false, texto: null };
   }
 
   if (proveedor === 'openai' && config.ocr.openaiApiKey) {
@@ -174,7 +266,7 @@ export async function analizarComprobante({ buffer, mimeType }) {
     }
   }
 
-  // 2) OCR local con Tesseract (no aplica a PDF).
+  // ---- Red de seguridad: OCR local (no aplica a PDF) ---------------
   if (proveedor !== 'manual' && !esPdf) {
     try {
       const { texto, confianza } = await conTesseract(buffer);
@@ -191,7 +283,7 @@ export async function analizarComprobante({ buffer, mimeType }) {
     }
   }
 
-  // 3) Sin extracción posible: el usuario diligencia los datos.
+  // ---- Sin extracción posible: el usuario diligencia los datos ------
   return {
     datos: { ...CAMPOS_VACIOS },
     origen: 'manual',

@@ -44,13 +44,17 @@ services:
         sync: false
 
       # --- Lectura de comprobantes ---
-      # Tesseract no cabe bien en los 512 MB del plan gratuito: se usa Gemini.
+      # auto = Tesseract primero (unos 0,4 s, sin red ni cuota) y Gemini solo
+      # si falta algun campo. Es lo mas rapido y lo que menos cuota gasta.
+      # Tesseract cabe en los 512 MB del plan gratuito: medido, 192 MB de pico.
       - key: OCR_PROVIDER
-        value: gemini
-      # Google retira modelos con frecuencia. Si la API responde 404 diciendo
-      # que el modelo ya no existe, se cambia aqui sin tocar el codigo.
+        value: auto
+      # Los Flash-Lite leen comprobantes igual de bien que los Flash grandes,
+      # responden mas rapido y su cuota gratuita es mucho mas holgada: los
+      # Flash de la serie 3.x se agotan en unas 20 peticiones al dia.
+      # Si la API responde 404 (modelo retirado) se cambia aqui.
       - key: GEMINI_MODELO
-        value: gemini-3.8-flash
+        value: gemini-3.5-flash-lite
       - key: GEMINI_API_KEY
         sync: false
 
