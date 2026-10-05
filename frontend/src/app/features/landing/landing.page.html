@@ -393,12 +393,10 @@
           <dt>Abono mínimo</dt>
           <dd>{{ abonoMinimo() | pesos }}</dd>
         </div>
-        @if (config()?.llavePago) {
-          <div class="data-row">
-            <dt>Llave para pagar</dt>
-            <dd class="text-lime">{{ config()?.llavePago }}</dd>
-          </div>
-        }
+        <div class="data-row">
+          <dt>Llave para pagar</dt>
+          <dd class="text-lime break-all">{{ llavePago() }}</dd>
+        </div>
       </dl>
     </div>
   </section>

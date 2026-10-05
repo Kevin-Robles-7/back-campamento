@@ -65,6 +65,16 @@ export class LandingPage {
     return valor ? valor : 'Finca Agua Viva';
   });
 
+  /**
+   * Llave de pago con fallback robusto (mismo caso que el lugar:
+   * la API devuelve '' cuando falta el valor y '??' no lo cubre).
+   * Solo afecta lo que se muestra; la validación sigue en el backend.
+   */
+  protected readonly llavePago = computed(() => {
+    const valor = this.config()?.llavePago?.trim();
+    return valor ? valor : '@Plata3143817689';
+  });
+
   protected readonly whatsapp = computed(() => {
     const numero = this.config()?.whatsapp ?? '573143817689';
     const texto = encodeURIComponent(
