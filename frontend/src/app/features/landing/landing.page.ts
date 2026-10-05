@@ -55,6 +55,16 @@ export class LandingPage {
   protected readonly tarifaVehiculo = computed(() => this.config()?.tarifaVehiculoPropio ?? 180000);
   protected readonly abonoMinimo = computed(() => this.config()?.abonoMinimo ?? 20000);
 
+  /**
+   * Lugar del campamento con fallback robusto.
+   * El backend devuelve '' cuando la clave falta en Supabase y '??' no
+   * cubre ese caso (solo null/undefined), por eso se usa trim + fallback.
+   */
+  protected readonly lugarEvento = computed(() => {
+    const valor = this.config()?.lugarEvento?.trim();
+    return valor ? valor : 'Finca Agua Viva';
+  });
+
   protected readonly whatsapp = computed(() => {
     const numero = this.config()?.whatsapp ?? '573143817689';
     const texto = encodeURIComponent(
