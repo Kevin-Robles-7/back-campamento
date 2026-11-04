@@ -20,5 +20,9 @@ backend/uploads/
 # Insumos de trabajo (documentos originales, capturas)
 images/
 
+# Datos personales sensibles (consentimientos firmados de menores y firmas)
+consentimientos/
+backend/consentimientos_export/
+
 # Local Netlify folder
 .netlify

@@ -5,6 +5,7 @@ import { analizarComprobante } from '../services/comprobante-ocr.service.js';
 import { analizarCapacidad, obtenerConfiguracion } from '../services/configuracion.service.js';
 import {
   conEnlace,
+  buscarPersonaPorDocumento,
   consultarInscripcion,
   crearInscripcion,
   guardarComprobante,
@@ -12,13 +13,16 @@ import {
   mapearComprobante,
   obtenerInscripcion,
   registrarAbono,
+  registrarReparto,
   verificarComprobante,
 } from '../services/inscripciones.service.js';
 import { descartarComprobante, descartarDocumento } from '../services/limpieza.service.js';
 import {
   esquemaAbono,
+  esquemaBusquedaPersona,
   esquemaConsulta,
   esquemaCrearInscripcion,
+  esquemaReparto,
   validar,
 } from '../validators.js';
 
@@ -160,6 +164,21 @@ router.get(
   }),
 );
 
+// ------------------------------------------------------------
+//  Terminar inscripcion: buscar una persona por documento en TODAS las
+//  inscripciones, para añadirla a una distribucion de pagos.
+// ------------------------------------------------------------
+router.get(
+  '/personas/buscar',
+  asyncHandler(async (req, res) => {
+    const datos = validar(esquemaBusquedaPersona, req.query);
+    const persona = await buscarPersonaPorDocumento(datos.documento);
+    // Sin resultados es un estado normal, no un error: el cliente decide
+    // como mostrar «persona no encontrada».
+    res.json({ persona });
+  }),
+);
+
 router.get(
   '/inscripciones/:id',
   asyncHandler(async (req, res) => {
@@ -181,5 +200,18 @@ router.post(
     const datos = validar(esquemaAbono, req.body);
     const inscripcion = await registrarAbono(datos);
     res.status(201).json({ inscripcion });
+  }),
+);
+
+// ------------------------------------------------------------
+//  Terminar inscripcion: repartir un comprobante entre personas de
+//  cualquier inscripcion, con sumas exactas.
+// ------------------------------------------------------------
+router.post(
+  '/pagos/reparto',
+  asyncHandler(async (req, res) => {
+    const datos = validar(esquemaReparto, req.body);
+    const resultado = await registrarReparto(datos);
+    res.status(201).json(resultado);
   }),
 );

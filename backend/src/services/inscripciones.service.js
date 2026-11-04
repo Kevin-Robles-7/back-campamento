@@ -495,7 +495,7 @@ export async function registrarAbono({ inscripcionId, personaId, comprobanteId, 
   // Todo el dinero debe quedar aplicado: no se aceptan pagos que excedan
   // lo que realmente se puede cubrir.
   const objetivoPrevio = personaId
-    ? await queryOne('SELECT saldo_pendiente FROM personas WHERE id = $1 AND inscripcion_id = $2', [
+    ? await queryOne('SELECT saldo_pendiente, es_cortesia FROM personas WHERE id = $1 AND inscripcion_id = $2', [
         personaId,
         inscripcionId,
       ])
@@ -503,6 +503,10 @@ export async function registrarAbono({ inscripcionId, personaId, comprobanteId, 
 
   if (personaId && !objetivoPrevio) {
     throw new ErrorNegocio('La persona no pertenece a esta inscripcion.', 422);
+  }
+
+  if (objetivoPrevio?.es_cortesia) {
+    throw new ErrorNegocio('Esta persona tiene una inscripción de cortesía y no admite cobros.', 422);
   }
 
   const maximoAplicable = soloPersona && objetivoPrevio
@@ -537,10 +541,13 @@ export async function registrarAbono({ inscripcionId, personaId, comprobanteId, 
         [personaId, inscripcionId],
       );
       if (!objetivo) throw new ErrorNegocio('La persona no pertenece a esta inscripcion.', 422);
+      if (objetivo.es_cortesia) {
+        throw new ErrorNegocio('Esta persona tiene una inscripción de cortesía y no admite cobros.', 422);
+      }
     } else {
       objetivo = await cx.queryOne(
         `SELECT * FROM personas
-          WHERE inscripcion_id = $1 AND saldo_pendiente > 0
+          WHERE inscripcion_id = $1 AND saldo_pendiente > 0 AND NOT es_cortesia
           ORDER BY saldo_pendiente DESC LIMIT 1`,
         [inscripcionId],
       );
@@ -555,7 +562,7 @@ export async function registrarAbono({ inscripcionId, personaId, comprobanteId, 
     // Distribuye el abono empezando por la persona objetivo.
     let restante = valor;
     const todas = await cx.query(
-      `SELECT * FROM personas WHERE inscripcion_id = $1 ORDER BY (id = $2) DESC, id`,
+      `SELECT * FROM personas WHERE inscripcion_id = $1 AND NOT es_cortesia ORDER BY (id = $2) DESC, id`,
       [inscripcionId, objetivo?.id ?? 0],
     );
 
@@ -585,8 +592,8 @@ export async function registrarAbono({ inscripcionId, personaId, comprobanteId, 
     }
 
     const totales = await cx.queryOne(
-      `SELECT COALESCE(SUM(valor_pagado), 0) AS pagado,
-              COALESCE(SUM(saldo_pendiente), 0) AS pendiente
+      `SELECT COALESCE(SUM(valor_pagado) FILTER (WHERE NOT es_cortesia), 0) AS pagado,
+              COALESCE(SUM(saldo_pendiente) FILTER (WHERE NOT es_cortesia), 0) AS pendiente
          FROM personas WHERE inscripcion_id = $1`,
       [inscripcionId],
     );
@@ -605,6 +612,250 @@ export async function registrarAbono({ inscripcionId, personaId, comprobanteId, 
   });
 
   return obtenerInscripcion(inscripcionId);
+}
+
+// ------------------------------------------------------------
+//  Reparto entre inscripciones distintas
+// ------------------------------------------------------------
+
+const aPesos = (valor) => `$${Number(valor).toLocaleString('es-CO')}`;
+
+/**
+ * Busca una persona por documento en TODAS las inscripciones.
+ * `personas.documento` es UNIQUE en la base, asi que devuelve como maximo
+ * una persona: su registro existente, nunca un duplicado.
+ */
+export async function buscarPersonaPorDocumento(documento) {
+  const persona = await queryOne(
+    `SELECT p.*, i.codigo AS inscripcion_codigo, i.estado AS inscripcion_estado,
+            i.saldo_pendiente AS inscripcion_saldo
+       FROM personas p
+       JOIN inscripciones i ON i.id = p.inscripcion_id
+      WHERE p.documento = $1`,
+    [documento],
+  );
+  if (!persona) return null;
+  return mapearPersonaReparto(persona);
+}
+
+function mapearPersonaReparto(p) {
+  return {
+    id: p.id,
+    inscripcionId: p.inscripcion_id,
+    inscripcionCodigo: p.inscripcion_codigo,
+    inscripcionEstado: p.inscripcion_estado,
+    inscripcionSaldo: Number(p.inscripcion_saldo),
+    nombreCompleto: p.nombre_completo,
+    tipoDocumento: p.tipo_documento,
+    documento: p.documento,
+    telefono: p.telefono,
+    valorAsignado: Number(p.valor_asignado),
+    valorPagado: Number(p.valor_pagado),
+    saldoPendiente: Number(p.saldo_pendiente),
+    esCortesia: Boolean(p.es_cortesia),
+    estado: p.estado,
+  };
+}
+
+/**
+ * Reparte el dinero de un comprobante entre personas de CUALQUIER
+ * inscripcion, indicando exactamente cuanto recibe cada una.
+ *
+ * Reglas duras:
+ *  - La suma de las asignaciones debe ser EXACTAMENTE el valor del
+ *    comprobante: no queda dinero sin asignar ni de mas.
+ *  - Ninguna asignacion supera el saldo pendiente de su persona.
+ *  - Las personas conservan su inscripcion original y su codigo: solo se
+ *    aplica dinero sobre su saldo. Cada asignacion genera su propia fila
+ *    en `pagos` vinculada a la persona, su inscripcion y el comprobante.
+ *  - El comprobante queda marcado como usado y ya no se puede reutilizar.
+ *
+ * Todo dentro de una transaccion: si algo falla, no se guarda nada.
+ */
+export async function registrarReparto({ comprobanteId, asignaciones }) {
+  const cfg = await obtenerConfiguracion();
+
+  const comprobante = await queryOne('SELECT * FROM comprobantes WHERE id = $1', [comprobanteId]);
+  if (!comprobante) throw new ErrorNegocio('Comprobante no encontrado.', 404);
+  if (comprobante.inscripcion_id) {
+    throw new ErrorNegocio('Este comprobante ya fue usado en otra inscripcion.', 409);
+  }
+  if (!comprobante.verificado) {
+    throw new ErrorNegocio(
+      'Este comprobante no pasó la verificación automática. Sube una imagen más clara.',
+      422,
+    );
+  }
+
+  const llave = await validarLlaveDestino(comprobante.llave_destino);
+  if (!llave.valida) {
+    throw new ErrorNegocio(
+      `El pago no fue enviado a una cuenta del campamento. Debe enviarse a: ${llave.llavesValidas.join(' o ')}.`,
+      422,
+    );
+  }
+
+  const valor = Number(comprobante.valor_enviado) || 0;
+  if (valor < cfg.abonoMinimo) {
+    throw new ErrorNegocio(
+      `El abono debe ser de al menos ${aPesos(cfg.abonoMinimo)}.`,
+      422,
+    );
+  }
+
+  // Una persona aparece una sola vez en la distribucion.
+  const idsUnicos = new Set(asignaciones.map((a) => a.personaId));
+  if (idsUnicos.size !== asignaciones.length) {
+    throw new ErrorNegocio(
+      'Hay personas repetidas en la distribucion. El dinero de una persona se asigna en una sola linea.',
+      422,
+    );
+  }
+
+  // El dinero recibido y el dinero asignado deben cuadrar exactamente:
+  // ni faltante ni sobrante.
+  const asignado = asignaciones.reduce((suma, a) => suma + (Number(a.valor) || 0), 0);
+  if (asignado !== valor) {
+    const diferencia = valor - asignado;
+    throw new ErrorNegocio(
+      diferencia > 0
+        ? `No puedes finalizar el proceso. Recibiste ${aPesos(valor)} y asignaste ${aPesos(asignado)}: te faltan ${aPesos(diferencia)} por asignar.`
+        : `Las asignaciones suman ${aPesos(asignado)} y el comprobante es de ${aPesos(valor)}: no puedes asignar mas dinero del recibido.`,
+      422,
+      { recibido: valor, asignado, diferencia },
+    );
+  }
+
+  await withTransaction(async (cx) => {
+    // Bloquea el comprobante: dos repartos concurrentes con el mismo
+    // comprobante se serializan aqui, y el segundo ve que ya fue usado.
+    const bloqueado = await cx.queryOne(
+      'SELECT * FROM comprobantes WHERE id = $1 FOR UPDATE',
+      [comprobanteId],
+    );
+    if (!bloqueado) throw new ErrorNegocio('Comprobante no encontrado.', 404);
+    if (bloqueado.inscripcion_id) {
+      throw new ErrorNegocio('Este comprobante ya fue usado en otra inscripcion.', 409);
+    }
+    const yaPagado = await cx.queryOne(
+      'SELECT id FROM pagos WHERE comprobante_id = $1 LIMIT 1',
+      [comprobanteId],
+    );
+    if (yaPagado) {
+      throw new ErrorNegocio('Este comprobante ya tiene pagos registrados.', 409);
+    }
+
+    // Valida y bloquea cada persona con su saldo real y actual:
+    // ni cortesias, ni asignar de mas, ni personas inexistentes.
+    const asignadas = [];
+    for (const linea of asignaciones) {
+      const persona = await cx.queryOne(
+        `SELECT p.*, i.codigo AS inscripcion_codigo
+           FROM personas p
+           JOIN inscripciones i ON i.id = p.inscripcion_id
+          WHERE p.id = $1
+          FOR UPDATE OF p`,
+        [linea.personaId],
+      );
+      if (!persona) {
+        throw new ErrorNegocio('Una de las personas asignadas no existe.', 422, {
+          personaId: linea.personaId,
+        });
+      }
+      if (persona.es_cortesia) {
+        throw new ErrorNegocio(
+          `${persona.nombre_completo} tiene una inscripción de cortesía y no admite cobros.`,
+          422,
+          { personaId: persona.id },
+        );
+      }
+      const saldo = Number(persona.saldo_pendiente) || 0;
+      if (linea.valor > saldo) {
+        throw new ErrorNegocio(
+          `A ${persona.nombre_completo} solo le queda un saldo de ${aPesos(saldo)}; no puedes asignarle ${aPesos(linea.valor)}.`,
+          422,
+          { personaId: persona.id, saldo, valor: linea.valor },
+        );
+      }
+      asignadas.push({ persona, valor: linea.valor });
+    }
+
+    // Marca el comprobante como usado, vinculado a la inscripcion de la
+    // primera persona asignada. Asi el chequeo «transaccion_usada» rechaza
+    // capturas repetidas y la limpieza de borradores no lo elimina.
+    await cx.query('UPDATE comprobantes SET inscripcion_id = $1 WHERE id = $2', [
+      asignadas[0].persona.inscripcion_id,
+      comprobanteId,
+    ]);
+
+    for (const { persona, valor: parte } of asignadas) {
+      // Historial: una fila por asignacion, amarrada a la persona, su
+      // inscripcion original y el comprobante.
+      await cx.query(
+        `INSERT INTO pagos (inscripcion_id, persona_id, comprobante_id, valor, tipo)
+         VALUES ($1, $2, $3, $4, 'abono')`,
+        [persona.inscripcion_id, persona.id, comprobanteId, parte],
+      );
+
+      const nuevoPagado = Number(persona.valor_pagado) + parte;
+      const nuevoSaldo = Number(persona.saldo_pendiente) - parte;
+      await cx.query(
+        `UPDATE personas
+            SET valor_pagado = $1, saldo_pendiente = $2, estado = $3, tipo_pago = $4
+          WHERE id = $5`,
+        [
+          nuevoPagado,
+          nuevoSaldo,
+          nuevoSaldo === 0 ? 'completo' : 'abono',
+          nuevoSaldo === 0 ? 'completo' : 'abono',
+          persona.id,
+        ],
+      );
+    }
+
+    // Recalcula los totales de cada inscripcion afectada. Las personas ajenas
+    // conservan sus cifras: solo cambia lo de las personas asignadas.
+    const idsInscripciones = [...new Set(asignadas.map((a) => a.persona.inscripcion_id))];
+    for (const idInscripcion of idsInscripciones) {
+      const totales = await cx.queryOne(
+        `SELECT COALESCE(SUM(valor_pagado) FILTER (WHERE NOT es_cortesia), 0) AS pagado,
+                COALESCE(SUM(saldo_pendiente) FILTER (WHERE NOT es_cortesia), 0) AS pendiente
+           FROM personas WHERE inscripcion_id = $1`,
+        [idInscripcion],
+      );
+      const saldoPendiente = Number(totales.pendiente);
+      await cx.query(
+        `UPDATE inscripciones
+            SET total_pagado = $1, saldo_pendiente = $2, estado = $3
+          WHERE id = $4`,
+        [
+          Number(totales.pagado),
+          saldoPendiente,
+          saldoPendiente === 0 ? 'completada' : 'activa',
+          idInscripcion,
+        ],
+      );
+    }
+  });
+
+  // Devuelve el estado final de cada inscripcion tocada, en el orden en que
+  // fueron asignadas por primera vez.
+  const idsInscripciones = [];
+  for (const { personaId } of asignaciones) {
+    const persona = await queryOne(
+      'SELECT inscripcion_id FROM personas WHERE id = $1',
+      [personaId],
+    );
+    if (persona && !idsInscripciones.includes(persona.inscripcion_id)) {
+      idsInscripciones.push(persona.inscripcion_id);
+    }
+  }
+
+  const inscripciones = [];
+  for (const idInscripcion of idsInscripciones) {
+    inscripciones.push(await obtenerInscripcion(idInscripcion));
+  }
+  return { inscripciones };
 }
 
 // ------------------------------------------------------------
@@ -645,6 +896,10 @@ function mapearInscripcion(inscripcion, personas, comprobantes, pagos) {
     valorPorPersona: Number(inscripcion.valor_por_persona),
     totalAPagar: Number(inscripcion.total_a_pagar),
     totalPagado: Number(inscripcion.total_pagado),
+    totalIngresosCortesia: personas.reduce(
+      (suma, persona) => suma + (persona.es_cortesia ? Number(persona.valor_pagado) || 0 : 0),
+      0,
+    ),
     saldoPendiente: Number(inscripcion.saldo_pendiente),
     estado: inscripcion.estado,
     creadaEn: inscripcion.created_at,
@@ -667,6 +922,7 @@ function mapearInscripcion(inscripcion, personas, comprobantes, pagos) {
       valorAsignado: Number(p.valor_asignado),
       valorPagado: Number(p.valor_pagado),
       saldoPendiente: Number(p.saldo_pendiente),
+      esCortesia: Boolean(p.es_cortesia),
       estado: p.estado,
     })),
     comprobantes: comprobantes.map(mapearComprobante),

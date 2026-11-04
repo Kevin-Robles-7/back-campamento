@@ -42,7 +42,7 @@ export function limpiarUrl(url) {
 export function opcionesConexion(url = config.db.url) {
   const limpia = limpiarUrl(url);
   return limpia
-    ? { connectionString: limpia, ssl: { rejectUnauthorized: false } }
+    ? { connectionString: limpia, ssl: config.db.ssl ? { rejectUnauthorized: false } : false }
     : {
         host: config.db.host,
         port: config.db.port,

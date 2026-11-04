@@ -8,6 +8,7 @@ import type {
   DocumentoConsentimiento,
   Inscripcion,
   PersonaInput,
+  PersonaReparto,
   RespuestaComprobante,
 } from '../models/campamento.models';
 
@@ -103,6 +104,32 @@ export class ApiService {
   }): Observable<{ inscripcion: Inscripcion }> {
     return this.http
       .post<{ inscripcion: Inscripcion }>(`${this.base}/pagos`, datos)
+      .pipe(catchError(this.fallar));
+  }
+
+  /**
+   * Busca una persona por documento en TODAS las inscripciones, para añadirla
+   * a una distribución. Devuelve `null` cuando el documento no existe.
+   */
+  buscarPersona(documento: string): Observable<{ persona: PersonaReparto | null }> {
+    return this.http
+      .get<{ persona: PersonaReparto | null }>(`${this.base}/personas/buscar`, {
+        params: { documento },
+      })
+      .pipe(catchError(this.fallar));
+  }
+
+  /**
+   * Reparte el comprobante entre personas de cualquier inscripción, con
+   * sumas exactas: la suma de las asignaciones debe igualar el valor
+   * recibido. Devuelve el estado final de cada inscripción afectada.
+   */
+  registrarReparto(datos: {
+    comprobanteId: number;
+    asignaciones: { personaId: number; valor: number }[];
+  }): Observable<{ inscripciones: Inscripcion[] }> {
+    return this.http
+      .post<{ inscripciones: Inscripcion[] }>(`${this.base}/pagos/reparto`, datos)
       .pipe(catchError(this.fallar));
   }
 

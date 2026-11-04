@@ -75,11 +75,17 @@
                   {{ persona.tipoDocumento }} {{ persona.documento }} · {{ persona.telefono }}
                 </p>
                 <p class="text-xs text-muted">
-                  Pagado {{ persona.valorPagado | pesos }} · Saldo
-                  {{ persona.saldoPendiente | pesos }}
+                  @if (persona.esCortesia) {
+                    Cortesía · ingreso recibido aparte {{ persona.valorPagado | pesos }}
+                  } @else {
+                    Pagado {{ persona.valorPagado | pesos }}
+                  }
+                  · Saldo {{ persona.saldoPendiente | pesos }}
                 </p>
               </div>
-              @if (persona.estado === 'completo') {
+              @if (persona.esCortesia) {
+                <span class="badge badge-ok">Cortesía</span>
+              } @else if (persona.estado === 'completo') {
                 <span class="badge badge-ok">Completo</span>
               } @else {
                 <span class="badge badge-warn">Abono</span>
@@ -99,8 +105,12 @@
             <dd>{{ ins.totalAPagar | pesos }}</dd>
           </div>
           <div class="data-row">
-            <dt>Total pagado</dt>
+            <dt>Recibido de participantes</dt>
             <dd>{{ ins.totalPagado | pesos }}</dd>
+          </div>
+          <div class="data-row">
+            <dt>Ingreso recibido por cortesías</dt>
+            <dd>{{ ins.totalIngresosCortesia | pesos }}</dd>
           </div>
           <div class="data-row">
             <dt>Saldo pendiente</dt>

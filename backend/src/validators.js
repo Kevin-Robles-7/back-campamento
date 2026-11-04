@@ -233,6 +233,41 @@ export const esquemaAbono = z.object({
     .transform((v) => v === true),
 });
 
+/**
+ * Búsqueda de una persona para añadir a una distribución de pagos.
+ * El documento se busca en TODAS las inscripciones, no solo en una.
+ */
+export const esquemaBusquedaPersona = z.object({
+  documento: z
+    .string()
+    .trim()
+    .min(4, 'Escribe el número de documento (mínimo 4 dígitos)')
+    .max(20)
+    .regex(ALFANUMERICO, 'El documento solo admite letras y números'),
+});
+
+/**
+ * Reparto exacto de un comprobante entre personas de cualquier inscripción.
+ * Cada asignación dice a cuánto dinero va cada persona; la suma de todas
+ * debe ser EXACTAMENTE el valor del comprobante (se valida en el servicio).
+ */
+export const esquemaReparto = z.object({
+  comprobanteId: z.coerce.number().int().positive(),
+  asignaciones: z
+    .array(
+      z.object({
+        personaId: z.coerce.number().int().positive(),
+        valor: z
+          .coerce
+          .number()
+          .int('La asignación debe ser un valor entero en pesos')
+          .min(1, 'La asignación debe ser de al menos $1'),
+      }),
+    )
+    .min(1, 'Registra al menos una asignación')
+    .max(50, 'No puedes asignar el pago a más de 50 personas'),
+});
+
 /** Valida el cuerpo y responde 422 con los errores en caso de fallo. */
 export function validar(esquema, datos) {
   const resultado = esquema.safeParse(datos);
