@@ -158,6 +158,13 @@ CREATE TABLE IF NOT EXISTS personas (
   updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Identifica inscripciones cuyo costo no se cobra. No altera la tarifa base,
+-- el dinero recibido ni el estado de pago registrado.
+ALTER TABLE personas
+  ADD COLUMN IF NOT EXISTS es_cortesia BOOLEAN NOT NULL DEFAULT FALSE;
+COMMENT ON COLUMN personas.es_cortesia IS
+  'La persona cuenta como inscrita, pero su tarifa queda fuera de cobros e ingresos de participantes. Los recibos históricos se reportan aparte.';
+
 CREATE INDEX IF NOT EXISTS idx_personas_inscripcion ON personas (inscripcion_id);
 
 -- ------------------------------------------------------------

@@ -128,7 +128,10 @@ export class TarjetaPagoComponent {
     { initialValue: null },
   );
 
-  protected readonly llave = computed(() => this.config()?.llavePago ?? '@Plata3143817689');
+  protected readonly llave = computed(() => {
+    const valor = this.config()?.llavePago?.trim();
+    return valor ? valor : '@Plata3143817689';
+  });
   protected readonly abonoMinimo = computed(() => this.config()?.abonoMinimo ?? 20000);
 
   protected async copiar(): Promise<void> {

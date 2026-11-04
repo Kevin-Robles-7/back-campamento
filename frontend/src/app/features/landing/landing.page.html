@@ -49,7 +49,7 @@
         <ul class="grid gap-3 sm:grid-cols-3">
           @for (
             dato of [
-              { icono: 'map-pin', label: 'Lugar', valor: config()?.lugarEvento ?? 'Finca Agua Viva' },
+              { icono: 'map-pin', label: 'Lugar', valor: lugarEvento() },
               { icono: 'bus', label: 'Valor en bus', valor: (tarifaBus() | pesos) },
               { icono: 'wallet', label: 'Aparta desde', valor: (abonoMinimo() | pesos) }
             ];
@@ -135,7 +135,7 @@
       routerLink="/"
       fragment="pasos"
     >
-      {{ config()?.lugarEvento ?? 'Finca Agua Viva' }}
+      {{ lugarEvento() }}
       <span class="ml-1 inline-block animate-bounce" aria-hidden="true">↓</span>
     </a>
   </section>
@@ -375,7 +375,7 @@
         </div>
         <div class="data-row">
           <dt>Lugar</dt>
-          <dd>{{ config()?.lugarEvento ?? 'Finca Agua Viva' }}</dd>
+          <dd>{{ lugarEvento() }}</dd>
         </div>
         <div class="data-row">
           <dt>Organiza</dt>
@@ -393,12 +393,10 @@
           <dt>Abono mínimo</dt>
           <dd>{{ abonoMinimo() | pesos }}</dd>
         </div>
-        @if (config()?.llavePago) {
-          <div class="data-row">
-            <dt>Llave para pagar</dt>
-            <dd class="text-lime">{{ config()?.llavePago }}</dd>
-          </div>
-        }
+        <div class="data-row">
+          <dt>Llave para pagar</dt>
+          <dd class="text-lime break-all">{{ llavePago() }}</dd>
+        </div>
       </dl>
     </div>
   </section>

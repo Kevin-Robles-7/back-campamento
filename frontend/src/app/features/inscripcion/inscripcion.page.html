@@ -242,12 +242,19 @@
                       {{ persona.edad ?? '—' }} años · {{ persona.telefono }}
                     </p>
                     <p class="text-xs text-muted">
-                      {{ persona.transporte === 'bus' ? 'Bus' : 'Vehículo propio' }} · Pagado
-                      {{ persona.valorPagado | pesos }} · Saldo
+                      {{ persona.transporte === 'bus' ? 'Bus' : 'Vehículo propio' }} ·
+                      @if (persona.esCortesia) {
+                        Ingreso de cortesía recibido aparte {{ persona.valorPagado | pesos }}
+                      } @else {
+                        Pagado {{ persona.valorPagado | pesos }}
+                      }
+                      · Saldo
                       {{ persona.saldoPendiente | pesos }}
                     </p>
                   </div>
-                  @if (persona.estado === 'completo') {
+                  @if (persona.esCortesia) {
+                    <span class="badge badge-ok">Cortesía</span>
+                  } @else if (persona.estado === 'completo') {
                     <span class="badge badge-ok">Completo</span>
                   } @else {
                     <span class="badge badge-warn">Abono</span>
@@ -271,8 +278,12 @@
                 <dd>{{ inscripcion.totalAPagar | pesos }}</dd>
               </div>
               <div class="data-row">
-                <dt>Total pagado</dt>
+                <dt>Recibido de participantes</dt>
                 <dd>{{ inscripcion.totalPagado | pesos }}</dd>
+              </div>
+              <div class="data-row">
+                <dt>Ingreso recibido por cortesías</dt>
+                <dd>{{ inscripcion.totalIngresosCortesia | pesos }}</dd>
               </div>
               <div class="data-row">
                 <dt>Saldo pendiente</dt>

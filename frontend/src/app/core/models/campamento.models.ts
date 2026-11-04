@@ -153,7 +153,37 @@ export interface Persona {
   valorAsignado: number;
   valorPagado: number;
   saldoPendiente: number;
+  esCortesia: boolean;
   estado: 'abono' | 'completo';
+}
+
+/**
+ * Persona encontrada por documento para añadirla a una distribución.
+ * viene con los datos de su inscripción original: nunca se mueve de allí.
+ */
+export interface PersonaReparto {
+  id: number;
+  inscripcionId: number;
+  inscripcionCodigo: string;
+  inscripcionEstado: EstadoInscripcion;
+  inscripcionSaldo: number;
+  nombreCompleto: string;
+  tipoDocumento: TipoDocumento;
+  documento: string;
+  telefono: string;
+  valorAsignado: number;
+  valorPagado: number;
+  saldoPendiente: number;
+  esCortesia: boolean;
+  estado: 'abono' | 'completo';
+}
+
+/** Una línea de la distribución manual: persona + cuanto dinero le entra. */
+export interface AsignacionManual {
+  persona: PersonaReparto;
+  valor: number;
+  /** true cuando la asignación cubre todo su saldo. */
+  cierra: boolean;
 }
 
 export interface Pago {
@@ -171,6 +201,7 @@ export interface Inscripcion {
   valorPorPersona: number;
   totalAPagar: number;
   totalPagado: number;
+  totalIngresosCortesia: number;
   saldoPendiente: number;
   estado: EstadoInscripcion;
   creadaEn: string;

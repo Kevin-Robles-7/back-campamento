@@ -84,8 +84,12 @@
                   <dd>{{ ins.totalAPagar | pesos }}</dd>
                 </div>
                 <div class="data-row">
-                  <dt>Total pagado</dt>
+                  <dt>Recibido de participantes</dt>
                   <dd>{{ ins.totalPagado | pesos }}</dd>
+                </div>
+                <div class="data-row">
+                  <dt>Ingreso recibido por cortesías</dt>
+                  <dd>{{ ins.totalIngresosCortesia | pesos }}</dd>
                 </div>
                 <div class="data-row">
                   <dt>Falta por pagar</dt>
@@ -166,13 +170,13 @@
             <h2 class="font-display text-lg font-extrabold">¿A quién se aplica el pago?</h2>
             <p class="text-sm text-cream-dim">
               Para cerrar toda la inscripción faltan
-              <strong class="text-aviso">{{ faltaTotal() | pesos }}</strong>. Elige la persona y
-              cómo quieres que se use el dinero.
+              <strong class="text-aviso">{{ faltaTotal() | pesos }}</strong
+              >. Elige la persona y cómo quieres que se use el dinero.
             </p>
           </div>
 
-          <!-- ====== Persona ====== -->
-          @if (conSaldo().length > 1) {
+          <!-- ====== Modo automático: solo personas de esta inscripción ====== -->
+          @if (!usaManual() && conSaldo().length > 1) {
             <div class="campo max-w-lg">
               <label class="campo-label" for="persona">Aplicar primero a</label>
               <select
@@ -229,6 +233,282 @@
             </fieldset>
           }
 
+          @if (usaManual()) {
+            <div class="alerta alerta-info">
+              <app-icon class="mt-0.5 shrink-0" name="info" [size]="18" />
+              <span>
+                <strong>Distribución manual activa.</strong>
+                Define tú cuánto recibe cada persona; la suma debe cuadrar exactamente con el
+                dinero que recibiste.
+              </span>
+            </div>
+          } @else {
+            <p class="text-sm text-muted">
+              ¿El dinero es para personas de <strong>otras inscripciones</strong>? Usa el bloque de
+              abajo para añadirlas a la distribución antes de subir el comprobante.
+            </p>
+          }
+
+          <!-- ====== Añadir persona de otra inscripción ====== -->
+          <div class="card-flush">
+            <header class="card-head">
+              <h3 class="card-title">
+                <app-icon name="plus" [size]="17" />
+                Añadir persona
+              </h3>
+              @if (asignadas().length) {
+                <span class="badge badge-lime">{{ asignadas().length }} en la distribución</span>
+              }
+            </header>
+
+            <div class="grid gap-3 p-5">
+              <p class="text-xs text-muted">
+                Busca por documento a cualquier persona inscrita —aunque sea de otra inscripción— y
+                añádela al reparto de este pago. Su registro se usa tal cual existe; no se crea
+                ninguna persona nueva ni se cambia su inscripción.
+              </p>
+
+              <form
+                class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start"
+                [formGroup]="busquedaPersona"
+                (ngSubmit)="buscarPersona()"
+              >
+                <div class="campo">
+                  <label class="campo-label" for="documento">Documento de la persona</label>
+                  <input
+                    id="documento"
+                    class="campo-control"
+                    type="text"
+                    inputmode="numeric"
+                    autocomplete="off"
+                    placeholder="1037654321"
+                    formControlName="documento"
+                  />
+                  <p class="campo-hint">Solo letras y números, sin puntos ni espacios</p>
+                </div>
+                <button
+                  class="btn btn-outline mt-8 min-w-36"
+                  type="submit"
+                  [disabled]="buscandoPersona()"
+                >
+                  @if (buscandoPersona()) {
+                    <span class="spinner"></span>
+                    Buscando…
+                  } @else {
+                    <app-icon name="search" [size]="17" />
+                    Buscar
+                  }
+                </button>
+              </form>
+
+              @if (sinResultados()) {
+                <div class="alerta alerta-warn" role="alert">
+                  <app-icon class="mt-0.5 shrink-0" name="info" [size]="18" />
+                  <span>
+                    <strong>No encontramos ninguna persona con ese documento.</strong>
+                    Verifica el número; si nunca se inscribió en el campamento, solo se puede
+                    inscribir desde la página principal.
+                  </span>
+                </div>
+              }
+
+              @if (personaBuscada(); as persona) {
+                <dl class="data-list">
+                  <div class="data-row">
+                    <dt>Nombre</dt>
+                    <dd class="font-semibold">{{ persona.nombreCompleto }}</dd>
+                  </div>
+                  <div class="data-row">
+                    <dt>Documento</dt>
+                    <dd>{{ persona.tipoDocumento }} {{ persona.documento }}</dd>
+                  </div>
+                  <div class="data-row">
+                    <dt>Inscripción</dt>
+                    <dd>
+                      <span class="badge badge-neutral">{{ persona.inscripcionCodigo }}</span>
+                      @if (persona.inscripcionEstado === 'completada') {
+                        <span class="badge badge-ok">Completada</span>
+                      } @else if (persona.inscripcionEstado === 'activa') {
+                        <span class="badge badge-warn">Activa</span>
+                      }
+                    </dd>
+                  </div>
+                  <div class="data-row">
+                    <dt>Valor asignado</dt>
+                    <dd>{{ persona.valorAsignado | pesos }}</dd>
+                  </div>
+                  <div class="data-row">
+                    <dt>Abonos de esta persona</dt>
+                    <dd>{{ persona.valorPagado | pesos }}</dd>
+                  </div>
+                  <div class="data-row">
+                    <dt>Saldo pendiente</dt>
+                    <dd [class.text-aviso]="persona.saldoPendiente > 0">
+                      {{ persona.saldoPendiente | pesos }}
+                    </dd>
+                  </div>
+                </dl>
+
+                @if (persona.esCortesia) {
+                  <div class="alerta alerta-warn">
+                    <app-icon class="mt-0.5 shrink-0" name="alert" [size]="18" />
+                    <span>
+                      <strong>Es una cortesía.</strong>
+                      Esta persona no admite cobros, así que no puede entrar a la distribución.
+                    </span>
+                  </div>
+                } @else if (yaAgregada()) {
+                  <p class="text-sm text-muted">
+                    Esta persona ya está en la distribución: ajusta cuánto recibe desde la lista
+                    de abajo.
+                  </p>
+                } @else {
+                  <div class="campo max-w-sm">
+                    <label class="campo-label" for="asignacion-nueva">Asignarle</label>
+                    <input
+                      id="asignacion-nueva"
+                      class="campo-control"
+                      type="text"
+                      inputmode="numeric"
+                      autocomplete="off"
+                      placeholder="0"
+                      [value]="valorNueva()"
+                      (input)="escribirValorNueva($any($event.target).value)"
+                    />
+                    <p class="campo-hint">
+                      @if (maximoNueva() > 0) {
+                        Máximo {{ maximoNueva() | pesos }}: su saldo
+                        {{ persona.saldoPendiente | pesos }}
+                        @if (comprobante()) {
+                          y lo que queda de este pago
+                        }
+                      } @else {
+                        Ya no queda dinero por asignar: quita o reduce alguna asignación
+                      }
+                    </p>
+                  </div>
+                  <button
+                    class="btn btn-lime w-fit"
+                    type="button"
+                    [disabled]="!valorNuevaValida()"
+                    (click)="agregarPersona()"
+                  >
+                    <app-icon name="plus" [size]="17" />
+                    Agregar a la distribución
+                  </button>
+                }
+              }
+            </div>
+          </div>
+
+          <!-- ====== Personas en la distribución manual ====== -->
+          @if (asignadas().length) {
+            <div class="card-flush">
+              <header class="card-head">
+                <h3 class="card-title">
+                  <app-icon name="users" [size]="17" />
+                  Personas en la distribución ({{ asignadas().length }})
+                </h3>
+                <span class="badge badge-lime">{{ asignado() | pesos }} asignados</span>
+              </header>
+
+              <ul class="grid gap-px bg-white/10">
+                @for (linea of asignadas(); track linea.persona.id) {
+                  <li class="grid gap-2 bg-green-dark p-4">
+                    <div class="flex items-center gap-3">
+                      <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm font-semibold">{{ linea.persona.nombreCompleto }}</p>
+                        <p class="text-xs text-muted">
+                          {{ linea.persona.tipoDocumento }} {{ linea.persona.documento }} ·
+                          debe {{ linea.persona.saldoPendiente | pesos }}
+                        </p>
+                      </div>
+                      <span class="badge badge-neutral">{{ linea.persona.inscripcionCodigo }}</span>
+                      <button
+                        class="btn btn-ghost btn-sm shrink-0"
+                        type="button"
+                        (click)="quitarPersona(linea.persona.id)"
+                      >
+                        <app-icon name="x" [size]="16" />
+                        Quitar
+                      </button>
+                    </div>
+                    <div class="grid items-center gap-2 sm:grid-cols-[auto_1fr]">
+                      <label class="text-xs text-muted" [attr.for]="'asignar-' + linea.persona.id">
+                        Se le asigna
+                      </label>
+                      <input
+                        class="campo-control max-w-48"
+                        type="text"
+                        inputmode="numeric"
+                        autocomplete="off"
+                        [id]="'asignar-' + linea.persona.id"
+                        [value]="linea.valor || ''"
+                        (input)="editarValor(linea.persona.id, $any($event.target).value)"
+                      />
+                    </div>
+                    @switch (tipoLinea(linea)) {
+                      @case ('cierra') {
+                        <p class="text-xs text-exito">
+                          Con {{ linea.valor | pesos }} su saldo queda en cero.
+                        </p>
+                      }
+                      @case ('abono') {
+                        <p class="text-xs text-muted">
+                          Abono de {{ linea.valor | pesos }}: seguirá debiendo
+                          {{ linea.persona.saldoPendiente - linea.valor | pesos }}.
+                        </p>
+                      }
+                      @case ('invalida') {
+                        <p class="text-xs font-semibold text-aviso">
+                          No se puede asignar {{ linea.valor | pesos }}: supera su deuda de
+                          {{ linea.persona.saldoPendiente | pesos }}.
+                        </p>
+                      }
+                      @case ('cero') {
+                        <p class="text-xs text-aviso">Indica cuánto dinero recibe esta persona.</p>
+                      }
+                    }
+                  </li>
+                }
+              </ul>
+
+              <!-- ====== Resumen financiero en vivo ====== -->
+              <dl class="data-list">
+                <div class="data-row">
+                  <dt>Dinero recibido</dt>
+                  <dd>
+                    @if (comprobante()) {
+                      {{ recibido() | pesos }}
+                    } @else {
+                      <span class="text-muted">se define al subir el comprobante</span>
+                    }
+                  </dd>
+                </div>
+                <div class="data-row">
+                  <dt>Total asignado</dt>
+                  <dd>{{ asignado() | pesos }}</dd>
+                </div>
+                <div class="data-row">
+                  <dt>Dinero restante por asignar</dt>
+                  <dd>
+                    @if (!comprobante()) {
+                      <span class="text-muted">—</span>
+                    } @else if (restante() === 0) {
+                      <span class="badge badge-ok">Todo el dinero tiene destino</span>
+                    } @else if (restante() > 0) {
+                      <span class="badge badge-warn">{{ restante() | pesos }} sin asignar</span>
+                    } @else {
+                      <span class="text-aviso font-semibold">
+                        Te pasas por {{ -restante() | pesos }}
+                      </span>
+                    }
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          }
+
           <app-tarjeta-pago />
 
           <h2 class="mt-2 font-display text-lg font-extrabold">Sube el comprobante</h2>
@@ -247,60 +527,177 @@
       @case ('confirmar') {
         @if (comprobante(); as comp) {
           <section class="animate-rise grid gap-4">
-            <div class="alerta alerta-ok">
-              <app-icon class="mt-0.5 shrink-0" name="check-circle" [size]="18" />
-              <span>
-                <strong>Pago verificado por {{ comp.valorEnviado | pesos }}</strong>
-                Revisa cómo se va a aplicar antes de registrarlo.
-              </span>
-            </div>
+            @if (usaManual()) {
+              <div class="alerta alerta-ok">
+                <app-icon class="mt-0.5 shrink-0" name="check-circle" [size]="18" />
+                <span>
+                  <strong>Pago verificado por {{ comp.valorEnviado | pesos }}</strong>
+                  Revisa el reparto manual antes de registrarlo.
+                </span>
+              </div>
+            } @else {
+              <div class="alerta alerta-ok">
+                <app-icon class="mt-0.5 shrink-0" name="check-circle" [size]="18" />
+                <span>
+                  <strong>Pago verificado por {{ comp.valorEnviado | pesos }}</strong>
+                  Revisa cómo se va a aplicar antes de registrarlo.
+                </span>
+              </div>
+            }
 
             <div class="card-flush">
               <header class="card-head">
-                <h3 class="card-title">
-                  <app-icon name="users" [size]="17" />
-                  Así se va a repartir
-                </h3>
-                @if (cerrara() > 0) {
+                @if (usaManual()) {
+                  <h3 class="card-title">
+                    <app-icon name="users" [size]="17" />
+                    Distribución exacta ({{ asignadas().length }} persona(s))
+                  </h3>
+                } @else {
+                  <h3 class="card-title">
+                    <app-icon name="users" [size]="17" />
+                    Así se va a repartir
+                  </h3>
+                }
+                @if (usaManual()) {
+                  @if (restante() === 0 && !hayInvalidas()) {
+                    <span class="badge badge-ok">Cuadra a $0</span>
+                  } @else {
+                    <span class="badge badge-warn">Revisa las sumas</span>
+                  }
+                } @else if (cerrara() > 0) {
                   <span class="badge badge-ok">Cierra {{ cerrara() }} persona(s)</span>
                 } @else {
                   <span class="badge badge-warn">No cierra a nadie</span>
                 }
               </header>
 
-              <ul class="grid gap-px bg-white/10">
-                @for (linea of reparto(); track linea.persona.id) {
-                  <li class="grid gap-1 bg-green-dark px-4 py-3">
-                    <div class="flex items-center justify-between gap-3">
-                      <p class="min-w-0 flex-1 truncate text-sm font-semibold">
-                        {{ linea.persona.nombreCompleto }}
-                      </p>
-                      @if (linea.cierra) {
-                        <span class="badge badge-ok">Queda completa</span>
-                      } @else if (linea.aplicado > 0) {
-                        <span class="badge badge-warn">Abono parcial</span>
-                      } @else {
-                        <span class="badge badge-neutral">Sin cambio</span>
-                      }
-                    </div>
-                    <div class="flex flex-wrap gap-x-4 text-xs text-muted">
-                      <span>Debía {{ linea.persona.saldoPendiente | pesos }}</span>
-                      <span class="text-lime">Se le aplica {{ linea.aplicado | pesos }}</span>
-                      <span>
-                        Queda debiendo
-                        <span [class.text-exito]="linea.saldoFinal === 0">
-                          {{ linea.saldoFinal | pesos }}
+              <!-- ====== Reparto manual: lo que definieron las asignaciones ====== -->
+              @if (usaManual()) {
+                <ul class="grid gap-px bg-white/10">
+                  @for (linea of asignadas(); track linea.persona.id) {
+                    <li class="grid gap-1 bg-green-dark px-4 py-3">
+                      <div class="flex items-center justify-between gap-3">
+                        <p class="min-w-0 flex-1 truncate text-sm font-semibold">
+                          {{ linea.persona.nombreCompleto }}
+                        </p>
+                        <span class="badge badge-neutral">{{ linea.persona.inscripcionCodigo }}</span>
+                        @switch (tipoLinea(linea)) {
+                          @case ('cierra') {
+                            <span class="badge badge-ok">Queda completa</span>
+                          }
+                          @case ('abono') {
+                            <span class="badge badge-warn">Abono parcial</span>
+                          }
+                          @case ('invalida') {
+                            <span class="badge badge-warn">Supera su deuda</span>
+                          }
+                          @case ('cero') {
+                            <span class="badge badge-warn">Sin valor definido</span>
+                          }
+                        }
+                      </div>
+                      <div class="flex flex-wrap gap-x-4 text-xs text-muted">
+                        <span>Debía {{ linea.persona.saldoPendiente | pesos }}</span>
+                        <span class="text-lime">Se le aplica {{ linea.valor | pesos }}</span>
+                        <span>
+                          Queda debiendo
+                          <span [class.text-exito]="linea.persona.saldoPendiente - linea.valor === 0">
+                            {{ linea.persona.saldoPendiente - linea.valor | pesos }}
+                          </span>
                         </span>
-                      </span>
-                    </div>
-                  </li>
-                }
-              </ul>
+                      </div>
+                    </li>
+                  }
+                </ul>
 
-              @if (sobrante() > 0) {
-                <p class="border-t border-white/10 px-4 py-3 text-xs text-aviso">
-                  Sobran {{ sobrante() | pesos }} que quedan como saldo a favor de la inscripción.
-                </p>
+                <dl class="data-list">
+                  <div class="data-row">
+                    <dt>Dinero recibido</dt>
+                    <dd>{{ recibido() | pesos }}</dd>
+                  </div>
+                  <div class="data-row">
+                    <dt>Total asignado</dt>
+                    <dd>{{ asignado() | pesos }}</dd>
+                  </div>
+                  <div class="data-row">
+                    <dt>Dinero restante por asignar</dt>
+                    <dd>
+                      @if (restante() === 0) {
+                        <span class="text-exito font-semibold">0 — todo el dinero tiene destino</span>
+                      } @else if (restante() > 0) {
+                        <span class="text-aviso font-semibold">{{ restante() | pesos }}</span>
+                      } @else {
+                        <span class="text-aviso font-semibold">
+                          excedido por {{ -restante() | pesos }}
+                        </span>
+                      }
+                    </dd>
+                  </div>
+                </dl>
+
+                @if (restante() > 0) {
+                  <div class="alerta alerta-warn" role="alert">
+                    <app-icon class="mt-0.5 shrink-0" name="alert" [size]="18" />
+                    <span>
+                      <strong>No puedes finalizar el proceso.</strong>
+                      Te faltan {{ restante() | pesos }} por asignar: sube a alguien o reparte más
+                      dinero entre los ya asignados.
+                    </span>
+                  </div>
+                } @else if (restante() < 0) {
+                  <div class="alerta alerta-error" role="alert">
+                    <app-icon class="mt-0.5 shrink-0" name="alert" [size]="18" />
+                    <span>
+                      <strong>No puedes finalizar el proceso.</strong>
+                      Las asignaciones superan el dinero recibido por {{ -restante() | pesos }}:
+                      reduce algunas de las asignaciones.
+                    </span>
+                  </div>
+                } @else if (hayInvalidas()) {
+                  <div class="alerta alerta-warn" role="alert">
+                    <app-icon class="mt-0.5 shrink-0" name="alert" [size]="18" />
+                    <span>
+                      <strong>Tienes asignaciones inválidas.</strong>
+                      Ninguna asignación puede ser 0 o superar la deuda pendiente de la persona.
+                    </span>
+                  </div>
+                }
+              } @else {
+                <!-- ====== Reparto automático (igual que siempre) ====== -->
+                <ul class="grid gap-px bg-white/10">
+                  @for (linea of reparto(); track linea.persona.id) {
+                    <li class="grid gap-1 bg-green-dark px-4 py-3">
+                      <div class="flex items-center justify-between gap-3">
+                        <p class="min-w-0 flex-1 truncate text-sm font-semibold">
+                          {{ linea.persona.nombreCompleto }}
+                        </p>
+                        @if (linea.cierra) {
+                          <span class="badge badge-ok">Queda completa</span>
+                        } @else if (linea.aplicado > 0) {
+                          <span class="badge badge-warn">Abono parcial</span>
+                        } @else {
+                          <span class="badge badge-neutral">Sin cambio</span>
+                        }
+                      </div>
+                      <div class="flex flex-wrap gap-x-4 text-xs text-muted">
+                        <span>Debía {{ linea.persona.saldoPendiente | pesos }}</span>
+                        <span class="text-lime">Se le aplica {{ linea.aplicado | pesos }}</span>
+                        <span>
+                          Queda debiendo
+                          <span [class.text-exito]="linea.saldoFinal === 0">
+                            {{ linea.saldoFinal | pesos }}
+                          </span>
+                        </span>
+                      </div>
+                    </li>
+                  }
+                </ul>
+
+                @if (sobrante() > 0) {
+                  <p class="border-t border-white/10 px-4 py-3 text-xs text-aviso">
+                    Sobran {{ sobrante() | pesos }} que quedan como saldo a favor de la inscripción.
+                  </p>
+                }
               }
             </div>
 
@@ -316,7 +713,7 @@
               <button
                 class="btn btn-lime flex-1 basis-44"
                 type="button"
-                [disabled]="registrando()"
+                [disabled]="registrando() || !puedeRegistrar()"
                 (click)="registrarPago()"
               >
                 @if (registrando()) {
@@ -350,6 +747,13 @@
                       {{ p.nombreCompleto }}{{ ultimo ? '.' : ', ' }}
                     }
                   </span>
+                } @else if (cierresReparto().length) {
+                  Personas de otras inscripciones que quedaron completas con este pago:
+                  <span class="text-cream">
+                    @for (c of cierresReparto(); track c.nombreCompleto; let ultimo = $last) {
+                      {{ c.nombreCompleto }} ({{ c.inscripcionCodigo }}){{ ultimo ? '.' : ', ' }}
+                    }
+                  </span>
                 } @else {
                   Este es el nuevo estado de tu inscripción.
                 }
@@ -375,14 +779,53 @@
               </div>
             }
 
+            <!-- ====== Inscripciones afectadas por el reparto manual ====== -->
+            @if (inscripcionesAfectadas().length) {
+              <div class="card-flush">
+                <header class="card-head">
+                  <h3 class="card-title">
+                    <app-icon name="users" [size]="17" />
+                    Inscripciones actualizadas ({{ inscripcionesAfectadas().length }})
+                  </h3>
+                </header>
+                <ul class="grid gap-px bg-white/10">
+                  @for (afectada of inscripcionesAfectadas(); track afectada.id) {
+                    <li class="flex items-center gap-3 bg-green-dark px-4 py-2.5">
+                      <div class="min-w-0 flex-1">
+                        <p class="text-sm font-semibold">
+                          {{ afectada.codigo }}
+                          @if (afectada.id === ins.id) {
+                            <span class="badge badge-lime">esta inscripción</span>
+                          }
+                        </p>
+                        <p class="text-xs text-muted">
+                          Saldo: {{ afectada.saldoPendiente | pesos }} ·
+                          Recibido: {{ afectada.totalPagado | pesos }}
+                        </p>
+                      </div>
+                      @if (afectada.estado === 'completada') {
+                        <span class="badge badge-ok">Completada</span>
+                      } @else {
+                        <span class="badge badge-warn">Activa</span>
+                      }
+                    </li>
+                  }
+                </ul>
+              </div>
+            }
+
             <dl class="data-list">
               <div class="data-row">
                 <dt>Valor total</dt>
                 <dd>{{ ins.totalAPagar | pesos }}</dd>
               </div>
               <div class="data-row">
-                <dt>Total pagado</dt>
+                <dt>Recibido de participantes</dt>
                 <dd>{{ ins.totalPagado | pesos }}</dd>
+              </div>
+              <div class="data-row">
+                <dt>Ingreso recibido por cortesías</dt>
+                <dd>{{ ins.totalIngresosCortesia | pesos }}</dd>
               </div>
               <div class="data-row">
                 <dt>Saldo pendiente</dt>
@@ -418,11 +861,17 @@
                   <div class="min-w-0 flex-1">
                     <p class="text-sm font-bold">{{ persona.nombreCompleto }}</p>
                     <p class="text-xs text-muted">
-                      Pagado {{ persona.valorPagado | pesos }} · Saldo
-                      {{ persona.saldoPendiente | pesos }}
+                      @if (persona.esCortesia) {
+                        Ingreso de cortesía recibido aparte {{ persona.valorPagado | pesos }}
+                      } @else {
+                        Pagado {{ persona.valorPagado | pesos }}
+                      }
+                      · Saldo {{ persona.saldoPendiente | pesos }}
                     </p>
                   </div>
-                  @if (persona.estado === 'completo') {
+                  @if (persona.esCortesia) {
+                    <span class="badge badge-ok">Cortesía</span>
+                  } @else if (persona.estado === 'completo') {
                     <span class="badge badge-ok">Completo</span>
                   } @else {
                     <span class="badge badge-warn">Abono</span>

@@ -55,6 +55,26 @@ export class LandingPage {
   protected readonly tarifaVehiculo = computed(() => this.config()?.tarifaVehiculoPropio ?? 180000);
   protected readonly abonoMinimo = computed(() => this.config()?.abonoMinimo ?? 20000);
 
+  /**
+   * Lugar del campamento con fallback robusto.
+   * El backend devuelve '' cuando la clave falta en Supabase y '??' no
+   * cubre ese caso (solo null/undefined), por eso se usa trim + fallback.
+   */
+  protected readonly lugarEvento = computed(() => {
+    const valor = this.config()?.lugarEvento?.trim();
+    return valor ? valor : 'Finca Agua Viva';
+  });
+
+  /**
+   * Llave de pago con fallback robusto (mismo caso que el lugar:
+   * la API devuelve '' cuando falta el valor y '??' no lo cubre).
+   * Solo afecta lo que se muestra; la validación sigue en el backend.
+   */
+  protected readonly llavePago = computed(() => {
+    const valor = this.config()?.llavePago?.trim();
+    return valor ? valor : '@Plata3143817689';
+  });
+
   protected readonly whatsapp = computed(() => {
     const numero = this.config()?.whatsapp ?? '573143817689';
     const texto = encodeURIComponent(
